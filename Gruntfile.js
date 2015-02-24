@@ -10,7 +10,7 @@ module.exports = function (grunt) {
 
     gtx.alias('unit', ['karma:unit:start', 'watch']);
     gtx.alias('e2e', ['connect:protractor', 'protractor:main']);
-    //gtx.alias('build', ['clean', 'less', 'copy:build', 'concat', 'uglify', 'jade']);
+    gtx.alias('build', ['clean', 'less', 'concat', 'uglify']);
 
     gtx.finalise();
 };

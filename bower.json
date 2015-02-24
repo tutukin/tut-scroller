@@ -1,6 +1,7 @@
 {
   "name": "tut-scroller",
   "version": "0.0.1",
+  "main": "build/js/tut-scroller.js"
   "authors": [
     "Andrei V. Toutoukine <toutoukine@gmail.com>"
   ],

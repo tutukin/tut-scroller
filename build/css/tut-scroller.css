@@ -1,0 +1,47 @@
+.tut-scroller {
+  position: relative;
+}
+.tut-scroller a.move-left,
+.tut-scroller a.move-right {
+  position: absolute;
+  top: 0;
+}
+.tut-scroller a.move-left:link,
+.tut-scroller a.move-right:link,
+.tut-scroller a.move-left:visited,
+.tut-scroller a.move-right:visited,
+.tut-scroller a.move-left:hover,
+.tut-scroller a.move-right:hover,
+.tut-scroller a.move-left:active,
+.tut-scroller a.move-right:active {
+  text-decoration: none;
+}
+.tut-scroller a.move-left {
+  right: -2em;
+}
+.tut-scroller a.move-left::before {
+  content: "〉";
+}
+.tut-scroller a.move-right {
+  left: -1em;
+}
+.tut-scroller a.move-right::before {
+  content: "〈";
+}
+.tut-scroller .window {
+  overflow: hidden;
+  position: relative;
+}
+.tut-scroller .window .items {
+  width: 3000px;
+  min-height: 1px;
+  position: relative;
+}
+.tut-scroller .window .items .item {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+.tut-scroller .window .items .hidden {
+  display: none;
+}
