@@ -1,0 +1,50 @@
+@very-wide:     3000px;
+
+.tut-scroller {
+  position: relative;
+
+  a.move-left,
+  a.move-right {
+    position: absolute;
+    top:      0;
+
+    &:link,
+    &:visited,
+    &:hover,
+    &:active {
+      text-decoration: none;
+    }
+  }
+
+  a.move-left {
+    &::before { content: "〉"}
+    right: -2em;
+  }
+
+  a.move-right {
+    &::before { content: "〈"}
+    left: -1em;
+  }
+
+
+  .window {
+    overflow: hidden;
+    position: relative;
+
+    .items {
+      width:  @very-wide;
+      min-height: 1px;
+      position: relative;
+
+      .item {
+        position: absolute;
+        top: 0;
+        left: 0;
+      }
+
+      .hidden {
+        display: none;
+      }
+    }
+  }
+}
