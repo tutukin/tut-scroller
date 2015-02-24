@@ -27,6 +27,7 @@ function ($compile, $templateCache) {
 
         angular.forEach(collection, function (item, i) {
             var el = _getItemTemplate(scope, item, i);
+            el.addClass('item');
             scope.pos[i] = scope.contentWidth;
             if ( scope.pos[i] >= scope.windowWidth ) {
                 _hide(el);
