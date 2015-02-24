@@ -14,7 +14,7 @@ function ($compile, $templateCache) {
 
     function link (scope, iElement, iAttrs, controller, transcludeFn) {
         var wrapper = iElement.find('.items');
-        var collection = scope[iAttrs.tutScroller] || [];
+        var collection = scope.items || [];
 
         iElement.addClass('tut-scroller');
         iElement.css('position', 'relative');
