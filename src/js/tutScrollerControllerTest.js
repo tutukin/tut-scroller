@@ -76,8 +76,8 @@ describe('tutScrollerController', function () {
 
             expect(scope.translate(-2)).to.equal(4);
             expect(scope.translate(-(2+612))).to.equal(4); // 612 = contentWidth * 12
-            expect(scope.translate(5)).to.equal(5);
-            expect(scope.translate(5+612)).to.equal(5);
+            expect(scope.translate(5)).to.equal(-1);
+            expect(scope.translate(5+612)).to.equal(-1);
 
             done();
         });

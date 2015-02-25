@@ -10,11 +10,18 @@ angular.module('tutScroller').controller('tutScrollerController',[
         };
 
         $scope.translate= function move (s) {
-            var res = ($scope.shift + s) % $scope.contentWidth;
-            if ( res <= -$scope.itemWidth ) {
-                res += $scope.contentWidth;
+            var left = ($scope.shift + s) % $scope.contentWidth;
+            var right = left + $scope.itemWidth;
+
+            if ( left <= -$scope.itemWidth ) {
+                left += $scope.contentWidth;
             }
-            return res;
+
+            if ( left < $scope.contentWidth && right > $scope.contentWidth ) {
+                left -= $scope.contentWidth;
+            }
+
+            return left;
         };
     }
 ])

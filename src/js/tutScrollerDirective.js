@@ -12,6 +12,7 @@ function ($compile, $templateCache) {
 
     function link (scope, iElement, iAttrs, controller, transcludeFn) {
         var wrapper = iElement.find('.items');
+        var window = iElement.find('.window');
         var collection = scope.items || [];
 
         iElement.addClass('tut-scroller');
@@ -19,7 +20,7 @@ function ($compile, $templateCache) {
 
         // FIXME: jQuery dep: .width()
         // default - to make unit tests work
-        scope.windowWidth = wrapper.width() || 400;
+        scope.windowWidth = window.width() || 400;
         scope.contentWidth = 0;
         scope.currentShift = 0;
 

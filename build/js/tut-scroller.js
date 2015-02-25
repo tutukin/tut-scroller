@@ -14,6 +14,7 @@ function ($compile, $templateCache) {
 
     function link (scope, iElement, iAttrs, controller, transcludeFn) {
         var wrapper = iElement.find('.items');
+        var window = iElement.find('.window');
         var collection = scope.items || [];
 
         iElement.addClass('tut-scroller');
@@ -21,7 +22,7 @@ function ($compile, $templateCache) {
 
         // FIXME: jQuery dep: .width()
         // default - to make unit tests work
-        scope.windowWidth = wrapper.width() || 400;
+        scope.windowWidth = window.width() || 400;
         scope.contentWidth = 0;
         scope.currentShift = 0;
 
@@ -188,11 +189,18 @@ angular.module('tutScroller').controller('tutScrollerController',[
         };
 
         $scope.translate= function move (s) {
-            var res = ($scope.shift + s) % $scope.contentWidth;
-            if ( res <= -$scope.itemWidth ) {
-                res += $scope.contentWidth;
+            var left = ($scope.shift + s) % $scope.contentWidth;
+            var right = left + $scope.itemWidth;
+
+            if ( left <= -$scope.itemWidth ) {
+                left += $scope.contentWidth;
             }
-            return res;
+
+            if ( left < $scope.contentWidth && right > $scope.contentWidth ) {
+                left -= $scope.contentWidth;
+            }
+
+            return left;
         };
     }
 ])
