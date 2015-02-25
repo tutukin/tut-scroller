@@ -17,9 +17,9 @@ function ($compile, $templateCache) {
         iElement.addClass('tut-scroller');
         iElement.css('position', 'relative');
 
-        //scope.windowWidth = wrapper.width();
-        // todo: calculate it!
-        scope.windowWidth = 400;
+        // FIXME: jQuery dep: .width()
+        // default - to make unit tests work
+        scope.windowWidth = wrapper.width() || 400;
         scope.contentWidth = 0;
         scope.currentShift = 0;
 
