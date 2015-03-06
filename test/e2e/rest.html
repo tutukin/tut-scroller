@@ -49,7 +49,12 @@
       })
       .controller('aController', function ($scope, Item) {
         $scope.selectedItem = '(none)';
-        $scope.itemsCollection = Item.query();
+        $scope.itemsCollection = [];
+
+        Item.query(function (res  ) {
+          $scope.itemsCollection = res;
+        });
+
         $scope.select = function (item) {
           $scope.$apply( function () {
             $scope.selectedItem = item;
