@@ -15,7 +15,6 @@ function ($compile, $templateCache) {
     function link (scope, iElement, iAttrs, controller, transcludeFn) {
         var wrapper = iElement.find('.items');
         var window = iElement.find('.window');
-        var collection = scope.items || [];
 
         iElement.addClass('tut-scroller');
         iElement.css('position', 'relative');
@@ -26,23 +25,9 @@ function ($compile, $templateCache) {
         scope.contentWidth = 0;
         scope.currentShift = 0;
 
-        angular.forEach(collection, function (item, i) {
-            var el = _getItemTemplate(scope, item, i);
-            el.addClass('item');
-            scope.pos[i] = scope.contentWidth;
-            if ( scope.pos[i] >= scope.windowWidth ) {
-                _hide(el);
-            }
-            else {
-                _showAt(el, scope.getX(i));
-            }
-            // FIXME: .width() comes from jQuery. Use .css()
-            // FIXME: note, jqLite.css supports INLINE styles only!!!
-            scope.contentWidth += el.width();
-            wrapper.append(el);
+        scope.$watch('items', function (a, b) {
+            _linkItems(scope, wrapper);
         });
-
-        scope.itemWidth = Math.floor(scope.contentWidth / collection.length);
 
         wrapper.on('mousedown', function (ev) {
             if ( ev.which !== 1 ) {
@@ -87,6 +72,29 @@ function ($compile, $templateCache) {
         iElement.find('a.move-right').on('click', function (ev) {
             _shift(iElement, scope, scope.itemWidth);
         });
+    }
+
+
+    function _linkItems (scope, wrapper) {
+        var collection = scope.items || [];
+
+        angular.forEach(collection, function (item, i) {
+            var el = _getItemTemplate(scope, item, i);
+            el.addClass('item');
+            scope.pos[i] = scope.contentWidth;
+            if ( scope.pos[i] >= scope.windowWidth ) {
+                _hide(el);
+            }
+            else {
+                _showAt(el, scope.getX(i));
+            }
+            // FIXME: .width() comes from jQuery. Use .css()
+            // FIXME: note, jqLite.css supports INLINE styles only!!!
+            scope.contentWidth += el.width();
+            wrapper.append(el);
+        });
+
+        scope.itemWidth = Math.floor(scope.contentWidth / collection.length);
     }
 
 
