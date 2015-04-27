@@ -14,6 +14,7 @@ module.exports = {
             'bower_components/jquery/dist/jquery.js',
             'bower_components/angular/angular.js',
             'bower_components/angular-mocks/angular-mocks.js',
+            'src/tutScroller.js',
             'src/js/**/*.js'
         ],
 

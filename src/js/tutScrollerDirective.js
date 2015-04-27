@@ -1,6 +1,6 @@
 angular.module('tutScroller').directive('tutScroller',
-['$compile', '$templateCache',
-function ($compile, $templateCache) {
+['$compile', '$templateCache', 'PointerMovements',
+function ($compile, $templateCache, PM) {
     var defaultTemplateHtml = '<div class="item">{{item}}</div>';
     var templateId;
     var itemTemplate;
@@ -23,48 +23,39 @@ function ($compile, $templateCache) {
             _linkItems(scope, wrapper);
         });
 
-        wrapper.on('mousedown', function (ev) {
-            if ( ev.which !== 1 ) {
-                return;
-            }
-
-            scope.origin = scope.reference = ev.pageX;
-            scope.maxShift = 0;
-
-            return _stopEvent(ev);
+        PM.attachTo(wrapper, {
+            clickThreshold: Math.floor(0.05 * scope.itemWidth) || 8, // Fixme: scope.itemWidth is not available right now
+            onmove: _shift,
+            onclick:selectItem
         });
 
-        wrapper.on('mouseup', function (ev) {
-            return _release(iElement, scope, ev);
-        });
+        function _shift (s) {
+            iElement.find('.item').each( function (i) {
+                var el = $(this);
+                var left = scope.pos[i] = scope.translate(scope.pos[i] + s);
+                if ( left >= scope.windowWidth ) {
+                    _hide(el);
+                }
+                else {
+                    _showAt(el, left);
+                }
+            });
+        }
 
-        wrapper.on('mouseleave', function (ev) {
-            return _release(iElement, scope, ev);
-        });
+        function selectItem (target) {
+            var item = angular.element(target).scope().item;
 
-        wrapper.on('mousemove', function (ev) {
-            var s;
-
-            if ( scope.reference === null ) {
-                return;
-            }
-
-            _shift(iElement, scope, ev.pageX - scope.reference);
-            scope.reference = ev.pageX;
-
-            s = Math.abs(scope.reference - scope.origin);
-            scope.maxShift = s > scope.maxShift ?
-                s : scope.maxShift;
-
-            return _stopEvent(ev);
-        });
+            scope.selectItem({
+                item : item
+            });
+        }
 
         iElement.find('a.move-left').on('click', function (ev) {
-            _shift(iElement, scope, -scope.itemWidth);
+            _shift(-scope.itemWidth);
         });
 
         iElement.find('a.move-right').on('click', function (ev) {
-            _shift(iElement, scope, scope.itemWidth);
+            _shift(scope.itemWidth);
         });
     }
 
@@ -89,34 +80,6 @@ function ($compile, $templateCache) {
         });
 
         scope.itemWidth = Math.floor(scope.contentWidth / collection.length);
-    }
-
-
-    function _stopEvent (ev) {
-        ev.stopPropagation();
-        ev.preventDefault();
-        return false;
-    }
-
-    function _release(iElement, scope, ev) {
-        if ( scope.reference === null ) {
-            return;
-        }
-        if ( scope.maxShift < Math.floor(0.05 * scope.itemWidth) ) {
-            _shift(iElement, scope, scope.origin - scope.reference );
-            if ( ev.type === 'mouseup' ) {
-                scope.selectItem({
-                    item : _getItemByElement(scope, ev.target)
-                });
-            }
-        }
-        scope.reference = null;
-        return _stopEvent(ev);
-    }
-
-    function _getItemByElement (scope, el) {
-        var s = angular.element(el).scope();
-        return s.item;
     }
 
 
@@ -147,18 +110,6 @@ function ($compile, $templateCache) {
         el.css('left', '' + left + 'px');
     }
 
-    function _shift (iElement, scope, s) {
-        iElement.find('.item').each( function (i) {
-            var el = $(this);
-            var left = scope.pos[i] = scope.translate(scope.pos[i] + s);
-            if ( left >= scope.windowWidth ) {
-                _hide(el);
-            }
-            else {
-                _showAt(el, left);
-            }
-        });
-    }
 
 
 
