@@ -1,4 +1,4 @@
-describe('tutScroller directive', function () {
+describe('tutScrollerDirective', function () {
     beforeEach(function (done) {
         var _this = this;
 

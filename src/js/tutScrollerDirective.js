@@ -5,12 +5,8 @@ function ($compile, $templateCache) {
     var templateId;
     var itemTemplate;
 
-    function compile (tElement, tAttrs) {
-        templateId = tAttrs.tutScrollerTemplate || null;
-        return link;
-    }
-
     function link (scope, iElement, iAttrs, controller, transcludeFn) {
+        templateId = iAttrs.tutScrollerTemplate || null;
         var wrapper = iElement.find('.items');
         var window = iElement.find('.window');
 
@@ -168,7 +164,7 @@ function ($compile, $templateCache) {
 
     return {
         restrict:   'A',
-        compile:    compile,
+        link:       link,
         scope:      {
             items:      '=tutScroller',
             selectItem: '&tutScrollerSelect'
