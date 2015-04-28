@@ -1,181 +1,110 @@
 angular.module('tutScroller', []);
 
 angular.module('tutScroller').directive('tutScroller',
-['$compile', '$templateCache',
-function ($compile, $templateCache) {
+['$compile', '$templateCache', 'PointerMovements', 'Scroller',
+function ($compile, $templateCache, PM, Scroller) {
     var defaultTemplateHtml = '<div class="item">{{item}}</div>';
-    var templateId;
-    var itemTemplate;
-
-    function compile (tElement, tAttrs) {
-        templateId = tAttrs.tutScrollerTemplate || null;
-        return link;
-    }
 
     function link (scope, iElement, iAttrs, controller, transcludeFn) {
         var wrapper = iElement.find('.items');
-        var window = iElement.find('.window');
+        var viewport = iElement.find('.window');
+
+        var scroller = new Scroller.Scroller({
+            windowWidth:    viewport.width(),
+            getItemSize:    getItemSize,
+            showItemAt:     showItemAt,
+            hideItem:       hideItem
+        });
+
+        var itemTemplate = iAttrs.tutScrollerTemplate ?
+            $templateCache.get(iAttrs.tutScrollerTemplate) :
+            defaultTemplateHtml;
 
         iElement.addClass('tut-scroller');
         iElement.css('position', 'relative');
 
-        // FIXME: jQuery dep: .width()
-        // default - to make unit tests work
-        scope.windowWidth = window.width() || 400;
-        scope.contentWidth = 0;
-        scope.currentShift = 0;
-
         scope.$watch('items', function (a, b) {
-            _linkItems(scope, wrapper);
+            _linkItems();
         });
 
-        wrapper.on('mousedown', function (ev) {
-            if ( ev.which !== 1 ) {
-                return;
-            }
-
-            scope.origin = scope.reference = ev.pageX;
-            scope.maxShift = 0;
-
-            return _stopEvent(ev);
+        var pointer = PM.attachTo(wrapper, {
+            clickThreshold: Math.floor(0.05 * scope.itemWidth) || 8, // Fixme: scope.itemWidth is not available right now
+            onmove: function _shift (s) { scroller.scroll(s); },
+            onclick:selectItem
         });
 
-        wrapper.on('mouseup', function (ev) {
-            return _release(iElement, scope, ev);
-        });
+        function selectItem (target) {
+            var item = angular.element(target).scope().item;
 
-        wrapper.on('mouseleave', function (ev) {
-            return _release(iElement, scope, ev);
-        });
-
-        wrapper.on('mousemove', function (ev) {
-            var s;
-
-            if ( scope.reference === null ) {
-                return;
-            }
-
-            _shift(iElement, scope, ev.pageX - scope.reference);
-            scope.reference = ev.pageX;
-
-            s = Math.abs(scope.reference - scope.origin);
-            scope.maxShift = s > scope.maxShift ?
-                s : scope.maxShift;
-
-            return _stopEvent(ev);
-        });
+            scope.selectItem({
+                item : item
+            });
+        }
 
         iElement.find('a.move-left').on('click', function (ev) {
-            _shift(iElement, scope, -scope.itemWidth);
+            var w = scroller.getMeanItemWidth();
+            var head = Math.ceil(0.5*w);
+            var tail = w - head;
+            scroller.scroll(-head);
+            pointer.autoscroll(-tail, Date.now());
         });
 
         iElement.find('a.move-right').on('click', function (ev) {
-            _shift(iElement, scope, scope.itemWidth);
-        });
-    }
-
-
-    function _linkItems (scope, wrapper) {
-        var collection = scope.items || [];
-
-        angular.forEach(collection, function (item, i) {
-            var el = _getItemTemplate(scope, item, i);
-            el.addClass('item');
-            scope.pos[i] = scope.contentWidth;
-            if ( scope.pos[i] >= scope.windowWidth ) {
-                _hide(el);
-            }
-            else {
-                _showAt(el, scope.getX(i));
-            }
-            // FIXME: .width() comes from jQuery. Use .css()
-            // FIXME: note, jqLite.css supports INLINE styles only!!!
-            scope.contentWidth += el.width();
-            wrapper.append(el);
+            var w = scroller.getMeanItemWidth();
+            var head = Math.ceil(0.5*w);
+            var tail = w - head;
+            scroller.scroll(head);
+            pointer.autoscroll(tail, Date.now());
         });
 
-        scope.itemWidth = Math.floor(scope.contentWidth / collection.length);
-    }
+        function _linkItems () {
+            var collection = scope.items || [];
 
-
-    function _stopEvent (ev) {
-        ev.stopPropagation();
-        ev.preventDefault();
-        return false;
-    }
-
-    function _release(iElement, scope, ev) {
-        if ( scope.reference === null ) {
-            return;
+            angular.forEach(collection, function (item, i) {
+                var el = _getItemTemplate(item, i);
+                el.addClass('item');
+                wrapper.append(el);
+                scroller.addItem(el);
+            });
         }
-        if ( scope.maxShift < Math.floor(0.05 * scope.itemWidth) ) {
-            _shift(iElement, scope, scope.origin - scope.reference );
-            if ( ev.type === 'mouseup' ) {
-                scope.selectItem({
-                    item : _getItemByElement(scope, ev.target)
-                });
-            }
+
+        function _getItemTemplate (item, index) {
+            var itemScope = scope.$new(true);
+            itemScope.item = item;
+            itemScope.index = index;
+
+            var el = $compile(itemTemplate)(itemScope);
+
+            return el;
         }
-        scope.reference = null;
-        return _stopEvent(ev);
-    }
-
-    function _getItemByElement (scope, el) {
-        var s = angular.element(el).scope();
-        return s.item;
     }
 
 
-
-
-    function _getItemTemplate (scope, item, index) {
-        var html = typeof templateId === 'string' ?
-            $templateCache.get(templateId) : defaultTemplateHtml;
-
-        var itemScope = scope.$new(true);
-        itemScope.item = item;
-        itemScope.index = index;
-
-        var el = $compile(html)(itemScope);
-
-        return el;
-    }
-
-
-    function _hide (el) {
+    function hideItem (el) {
         if ( ! el.hasClass('hidden') ) {
             el.addClass('hidden');
         }
     }
 
-    function _showAt (el, left) {
+    function showItemAt (left, el) {
         el.removeClass('hidden');
         el.css('left', '' + left + 'px');
     }
 
-    function _shift (iElement, scope, s) {
-        iElement.find('.item').each( function (i) {
-            var el = $(this);
-            var left = scope.pos[i] = scope.translate(scope.pos[i] + s);
-            if ( left >= scope.windowWidth ) {
-                _hide(el);
-            }
-            else {
-                _showAt(el, left);
-            }
-        });
+    function getItemSize (el) {
+        return el.width();
     }
+
 
 
 
     return {
         restrict:   'A',
-        compile:    compile,
+        link:       link,
         scope:      {
             items:      '=tutScroller',
             selectItem: '&tutScrollerSelect'
         },
-        controller: 'tutScrollerController',
         template:
             '<div class="window">' +
                 '<div class="items"></div>' +
@@ -185,32 +114,283 @@ function ($compile, $templateCache) {
     };
 }]);
 
-angular.module('tutScroller').controller('tutScrollerController',[
-    '$scope',
-    function ($scope) {
-        $scope.shift    = 0;
-        $scope.pos      = [];
-        $scope.reference= null;
+angular.module('tutScroller').factory('PointerMovements', [
+    '$window',
+    function ($window) {
 
-        $scope.getX     = function getX (n) {
-            return $scope.pos[n] + $scope.shift;
-        };
+    function attachTo (target, options) {
+        var service = new this.Movements(options);
 
-        $scope.translate= function move (s) {
-            var left = ($scope.shift + s) % $scope.contentWidth;
-            var right = left + $scope.itemWidth;
+        target.on('mousedown', function (ev) {
+            return service.tap(ev);
+        });
 
-            if ( left <= -$scope.itemWidth ) {
-                left += $scope.contentWidth;
-            }
+        target.on('mousemove', function (ev) {
+            return service.move(ev);
+        });
 
-            if ( left < $scope.contentWidth && right > $scope.contentWidth ) {
-                left -= $scope.contentWidth;
-            }
+        target.on('mouseup', function (ev) {
+            return service.release(ev);
+        });
 
-            return left;
-        };
+        target.on('mouseleave', function (ev) {
+            return service.release(ev);
+        });
+
+        return service;
     }
-])
+
+    function Movements (options) {
+        this.onclick = options.onclick || nop;
+        this.onmove = options.onmove || nop;
+        this.clickThreshold = options.clickThreshold || 0;
+
+        this._cleanState();
+    }
+
+    function nop () {}
+
+    var p = Movements.prototype;
+
+    p._cleanState = function _cleanState () {
+        this._state = {
+            maxShift:   0,
+            velocity:   0,
+            timestamp:  null,
+            reference:  null,
+            origin:     null
+        };
+    };
+
+    p.getMaxShift = function getMaxShift () {
+        return this._state.maxShift;
+    };
+
+    p.getReference = function getReference () {
+        return this._state.reference;
+    };
+
+    p.getOrigin = function getOrigin () {
+        return this._state.origin;
+    };
+
+    p.getVelocity = function getVelocity () {
+        return this._state.velocity;
+    };
+
+
+
+    p.tap = function tap (ev) {
+        if ( ! ev || ! ev.which || ev.which !== 1 ) {
+            return;
+        }
+
+        this._state.origin = this._state.reference = ev.pageX;
+        this._state.maxShift = 0;
+
+        this._state.timestamp = Date.now();
+
+        return _stopEvent(ev);
+    };
+
+
+
+    p.move = function move (ev) {
+        if ( typeof this._state.reference !== 'number' ) {
+            return;
+        }
+
+        var dist = ev.pageX - this._state.reference;
+        if ( typeof this.onmove === 'function' ) {
+            this.onmove(dist);
+        }
+
+        var shift = Math.abs(ev.pageX - this._state.origin);
+        this._state.maxShift = shift > this._state.maxShift ?
+            shift : this._state.maxShift;
+
+        var timestamp = Date.now();
+        var v = 1000*dist / (1 + timestamp - this._state.timestamp);
+        this._state.velocity = 0.8*v + 0.2*this._state.velocity;
+        this._state.timestamp = timestamp;
+
+        this._state.reference = ev.pageX;
+
+        return _stopEvent(ev);
+    }
+
+
+
+    p.release = function release (ev) {
+        var v;
+        if ( this._state.maxShift < this.clickThreshold ) {
+            if ( typeof this.onmove === 'function' ) {
+                this.onmove(this._state.origin - this._state.reference);
+            }
+
+            if ( ev.type === 'mouseup' && typeof this.onclick === 'function' ) {
+                this.onclick(ev.target);
+            }
+        }
+        else {
+            v = this.getVelocity();
+            if ( v > 10 || v < -10 ) {
+                this.autoscroll(0.8*v, this._state.timestamp);
+            }
+        }
+
+        this._cleanState();
+        return _stopEvent(ev);
+    }
+
+
+    p.autoscroll = function autoscroll (amplitude, t0, prevShift) {
+        var _this = this;
+        var shift = 0;
+        var delta = 0;
+
+        if ( typeof prevShift === 'number' ) {
+            shift = this.autoshift(amplitude, t0);
+            delta = Math.abs(shift - amplitude);
+
+            if ( delta < 0.5 ) {
+                this.onmove(amplitude-prevShift);
+                return;
+            }
+
+            this.onmove(shift - prevShift);
+        }
+
+        $window.requestAnimationFrame( function () {
+            _this.autoscroll(amplitude, t0, shift);
+        });
+    };
+
+    p.autoshift = function autoshift (amplitude, t0) {
+        var tau = ( t0 - Date.now() ) / 325.0;
+        var d = 1.0 - Math.exp(tau);
+        return amplitude * d;
+    };
+
+
+    function _stopEvent (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        return false;
+    }
+
+
+    return {
+        attachTo:  attachTo,
+        Movements: Movements
+    };
+}]);
+
+angular.module('tutScroller').factory('Scroller', function () {
+    function Scroller( options ) {
+        var _this = this;
+        this._windowWidth = options.windowWidth || 400;
+        this._contentWidth = 0;
+        this._items = [];
+
+        ['showItemAt', 'hideItem', 'getItemSize'].forEach(function (method) {
+            if ( typeof options[method] !== 'function' ) {
+                _this[method] = nop;
+            }
+            _this[method] = options[method]
+        });
+    }
+
+    var p = Scroller.prototype;
+
+    p.getWindowWidth = function getWindowWidth () {
+        return this._windowWidth;
+    };
+
+    p.getContentWidth = function getContentWidth () {
+        return this._contentWidth;
+    };
+
+    p.getMeanItemWidth = function getMeanItemWidth () {
+        var count = this._items.length;
+        return count === 0 ?
+            0 :
+            Math.ceil( this._contentWidth / count );
+    };
+
+
+
+    p.addItem = function addItem (el) {
+        var item = {
+            width:  this.getItemSize(el) || 0,
+            pos:    this._contentWidth,
+            el:     el
+        };
+
+        this._items.push(item);
+        this._contentWidth += item.width;
+
+        this._adjustItemVisibility(item);
+    };
+
+
+    p.scroll = function scroll (shift) {
+        var l = this._items.length;
+        var windowWidth = this.getWindowWidth();
+        var i, item, pos;
+
+        for ( i = 0; i < l; i++ ) {
+            item = this._items[i];
+            item.pos = this._translate(item.pos+shift, item.width);
+            this._adjustItemVisibility(item);
+        }
+    };
+
+    p.scrollLeft = function scrollLeft () {
+        var mw = this.getMeanItemWidth();
+        return this.scroll(-mw);
+    };
+
+    p.scrollRight = function scrollRight () {
+        var mw = this.getMeanItemWidth();
+        return this.scroll(mw);
+    };
+
+
+
+
+
+    p._adjustItemVisibility = function _adjustItemVisibility (item) {
+        if ( item.pos >= this._windowWidth ) {
+            this.hideItem(item.el);
+        }
+        else {
+            this.showItemAt(item.pos, item.el);
+        }
+    };
+
+
+    p._translate = function _translate (pos, size) {
+        var contentWidth = this.getContentWidth();
+        var left = pos % contentWidth;
+        var right = left + size;
+
+        if ( left <= -size ) {
+            left += contentWidth;
+        }
+
+        if ( left < contentWidth && right > contentWidth ) {
+            left -= contentWidth;
+        }
+
+        return left;
+    };
+
+    return {
+        Scroller:   Scroller
+    };
+
+    function nop () {}
+});
 
 //# sourceMappingURL=tut-scroller.js.map
