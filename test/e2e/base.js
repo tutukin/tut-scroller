@@ -40,6 +40,7 @@ describe('tut-scroller', function () {
       expect(moveLeft).eventually.to.exist;
 
       moveLeft.click();
+      browser.sleep(1500);
 
       element(by.css('.items')).getLocation()
       .then(function (loc) {
@@ -59,6 +60,7 @@ describe('tut-scroller', function () {
       expect(moveRight).eventually.to.exist;
 
       moveRight.click();
+      browser.sleep(1500);
 
       element(by.css('.items')).getLocation()
       .then(function (loc) {
@@ -77,7 +79,7 @@ describe('tut-scroller', function () {
   });
 
 
-  it('should move items with mouse', function () {
+  xit('should move items with mouse', function () {
       var itemsContainer = element( by.css('.items') );
       var items = this.items;
 

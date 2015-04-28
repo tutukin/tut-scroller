@@ -4,6 +4,18 @@ describe('PointerMovementsService', function () {
     beforeEach( function () {
         var _this = this;
 
+        this.$window = {
+            requestAnimationFrame: sinon.spy()
+        };
+
+        module( function($provide) {
+            $provide.value('$window', _this.$window);
+        });
+    });
+
+    beforeEach( function () {
+        var _this = this;
+
         this.ev = {
             which: 1,
             preventDefault: sinon.spy(),
@@ -127,8 +139,7 @@ describe('PointerMovementsService', function () {
 
 
     describe('.Movements()', function () {
-        it('should be a constructor', function () {
-            expect(this.PM).itself.to.respondTo('Movements');
+        beforeEach( function () {
             this.onmove = sinon.spy();
             this.onclick = sinon.spy();
             this.clickThreshold = 8;
@@ -138,6 +149,10 @@ describe('PointerMovementsService', function () {
                 onclick:    this.onclick,
                 clickThreshold: this.clickThreshold
             });
+        });
+
+        it('should be a constructor function', function () {
+            expect(this.PM).itself.to.respondTo('Movements');
         });
 
         it('should set onmove and onclick listeners', function () {
@@ -178,6 +193,18 @@ describe('PointerMovementsService', function () {
                 expect(this.pm.getOrigin()).to.be.null;
             });
         });
+
+        describe('#getVelocity()', function () {
+            it('should be an instance method', function () {
+                expect(this.PM.Movements).to.respondTo('getVelocity');
+            });
+
+            it('should return 0 by default', function () {
+                var v = this.pm.getVelocity();
+                expect(v).to.equal(0);
+            });
+        });
+
 
 
         describe('#tap(ev)', function () {
@@ -262,6 +289,33 @@ describe('PointerMovementsService', function () {
 
                 expect(this.pm.getMaxShift()).to.equal(20);
             });
+
+            it('should update velocity', function () {
+                this.pm._cleanState;
+                var clock = sinon.useFakeTimers();
+                var v = 0;
+                var vx, ve;
+
+                this.ev.pageX = 100;
+                this.pm.tap(this.ev);
+                clock.tick(500);
+                this.ev.pageX += 10;
+                this.pm.move(this.ev);
+                vx = Math.ceil(this.pm.getVelocity());
+                ve = Math.ceil(0.8*1000*10/501 + 0.2*v);
+
+                expect(vx).to.equal(ve);
+
+                v=vx;
+                clock.tick(500)
+                this.ev.pageX += 10;
+                this.pm.move(this.ev);
+                vx = this.pm.getVelocity();
+                vx = Math.ceil(this.pm.getVelocity());
+                ve = Math.ceil(0.8*1000*10/501 + 0.2*v);
+
+                clock.restore();
+            });
         });
 
 
@@ -269,6 +323,7 @@ describe('PointerMovementsService', function () {
         describe('#release(ev)', function () {
             beforeEach( function () {
                 this.pm._cleanState();
+                this.pm.autoscroll = sinon.spy();
                 this.ev.pageX = 100;
                 this.pm.tap(this.ev);
                 this.ev.$reset();
@@ -278,6 +333,22 @@ describe('PointerMovementsService', function () {
 
             it('should be an instance method', function () {
                 expect(this.PM.Movements).to.respondTo('release');
+            });
+
+            it('should call autoscroll if |velocity| > 10', function () {
+                var clock = sinon.useFakeTimers();
+                this.pm.getVelocity = sinon.stub().returns(-15);
+
+                this.ev.pageX += 100;
+                clock.tick(500);
+                this.pm.move(this.ev);
+
+                this.pm.release(this.ev);
+
+                expect(this.pm.autoscroll, 'pm.autoscroll()').calledOnce
+                    .and.calledWithExactly(-15*0.8, 500);
+
+                clock.restore();
             });
 
             it('should set reference to null', function () {
@@ -324,7 +395,97 @@ describe('PointerMovementsService', function () {
                     this.pm.release(this.ev);
                     expect(this.onclick, 'onclick()').not.called;
                 });
+
+                it('should not call autoscroll', function () {
+                    var target = this.ev.target = {an: 'event target'};
+                    this.pm.release(this.ev);
+                    expect(this.pm.autoscroll, 'pm.autoscroll()').not.called;
+                });
             });
         });
+
+
+        describe('#autoscroll(amplitude, time, prevShift)', function () {
+            beforeEach( function () {
+                this.pm.autoshift = sinon.stub();
+            });
+
+            it('should be an instance method', function () {
+                expect(this.PM.Movements).to.respondTo('autoscroll');
+            });
+
+            it('should immediately request animation frame for call self with prevShift=0 when prevShift is not given', function () {
+                this.pm.autoscroll(15, 100);
+
+                expect(this.$window.requestAnimationFrame, '$window.requestAnimationFrame()').calledOnce
+                    .and.calledWithExactly(sinon.match.func);
+
+                this.pm.autoscroll = sinon.spy();
+                this.$window.requestAnimationFrame.firstCall.args[0]();
+
+                expect(this.pm.autoscroll, 'autoscroll').calledOnce
+                    .and.calledWithExactly(15, 100, 0);
+
+                expect(this.onmove).not.called;
+
+
+            });
+
+            it('should calculate shift when prevShift is a number', function () {
+                this.pm.autoshift.returns(10);
+                this.pm.autoscroll(15, 100, 0);
+
+                expect(this.pm.autoshift).calledOnce
+                    .and.calledWithExactly(15, 100);
+            });
+
+            it('should call onmove with shift-prevShift when prevShift is a number', function () {
+                this.pm.autoshift.returns(10);
+                this.pm.autoscroll(15, 100, 5);
+
+                expect(this.onmove, 'onmove()').calledOnce
+                    .and.calledWithExactly(5);
+            });
+
+            it('should request animation frame with self, prevShift=shift if |shift| >= 0.5', function () {
+                this.pm.autoshift.returns(10);
+                this.pm.autoscroll(15, 100, 5);
+
+                expect(this.$window.requestAnimationFrame, '$window.requestAnimationFrame()').calledOnce
+                    .and.calledWithExactly(sinon.match.func);
+
+                this.pm.autoscroll = sinon.spy();
+
+                this.$window.requestAnimationFrame.firstCall.args[0]();
+
+                expect(this.pm.autoscroll, 'pm.autoscroll()').calledOnce
+                    .and.calledWithExactly(15, 100, 10);
+            });
+
+            it('should not request animation frame when |shift-amplitude| < 0.5', function () {
+                this.pm.autoshift.returns(14.6);
+                this.pm.autoscroll(15, 100, 5);
+
+                expect(this.$window.requestAnimationFrame).not.called;
+            });
+
+            it('should call onmove with amplitude - prevShift when |shift - amplitude| < 0.5', function () {
+                this.pm.autoshift.returns(14.6);
+                this.pm.autoscroll(15, 100, 5);
+
+                expect(this.onmove, 'onmove()').calledOnce
+                    .and.calledWithExactly(10);
+            });
+        });
+
+
+        describe('#autoshift(amplitude, t0)', function () {
+            it('should be an instance method', function () {
+                expect(this.PM.Movements).to.respondTo('autoshift');
+            });
+        });
+
+
+        
     });
 });

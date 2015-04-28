@@ -25,7 +25,7 @@ function ($compile, $templateCache, PM, Scroller) {
             _linkItems();
         });
 
-        PM.attachTo(wrapper, {
+        var pointer = PM.attachTo(wrapper, {
             clickThreshold: Math.floor(0.05 * scope.itemWidth) || 8, // Fixme: scope.itemWidth is not available right now
             onmove: function _shift (s) { scroller.scroll(s); },
             onclick:selectItem
@@ -40,11 +40,19 @@ function ($compile, $templateCache, PM, Scroller) {
         }
 
         iElement.find('a.move-left').on('click', function (ev) {
-            scroller.scrollLeft();
+            var w = scroller.getMeanItemWidth();
+            var head = Math.ceil(0.5*w);
+            var tail = w - head;
+            scroller.scroll(-head);
+            pointer.autoscroll(-tail, Date.now());
         });
 
         iElement.find('a.move-right').on('click', function (ev) {
-            scroller.scrollRight();
+            var w = scroller.getMeanItemWidth();
+            var head = Math.ceil(0.5*w);
+            var tail = w - head;
+            scroller.scroll(head);
+            pointer.autoscroll(tail, Date.now());
         });
 
         function _linkItems () {
