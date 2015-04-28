@@ -1,11 +1,22 @@
-describe.only('tutScrollerDirective', function () {
+describe('tutScrollerDirective', function () {
     beforeEach( module('tutScroller') );
 
     beforeEach( function () {
         var _this = this;
         this.PM = { attachTo: sinon.stub() };
+        this.SS = { Scroller: sinon.stub() };
+        this.scroller = {
+            scroll: sinon.spy(),
+            addItem: sinon.spy(),
+            scrollLeft: sinon.spy(),
+            scrollRight: sinon.spy()
+        };
+
+        this.SS.Scroller.returns(this.scroller);
+
         module( function($provide) {
             $provide.value('PointerMovements', _this.PM);
+            $provide.value('Scroller', _this.SS);
         });
     });
 
@@ -57,15 +68,8 @@ describe.only('tutScrollerDirective', function () {
 
         it('should shift elements by the given distance when the move is detected', function () {
             this.onmove(-10);
-
-            this.el.find('.item').each( function (i) {
-                var item = $(this);
-                var x = parseInt(item.css('left'), 10);
-                var xe = i*100 - 10;
-                if (xe < 400) {
-                    expect(x).to.equal(xe);
-                }
-            });
+            expect(this.scroller.scroll).calledOnce
+                .and.calledWithExactly(-10);
         });
     });
 
@@ -91,38 +95,22 @@ describe.only('tutScrollerDirective', function () {
 
             expect(itemsWrapper.length).to.equal(1);
             expect(items.length).to.equal(this.scope.items.length);
-        });
-
-        it('should add .hidden class to each item but the first 4', function () {
-            var itemEls = this.el.find('.item');
-            expect(itemEls.length).to.be.above(0);
-            itemEls.each( function (i) {
-                expect($(this).hasClass('hidden')).to.equal(i>3);
-            });
+            expect(this.scroller.addItem).has.callCount(this.scope.items.length);
         });
     });
 
 
-    describe('scope', function () {
-        beforeEach( function () {
-            this.isolateScope = this.el.isolateScope();
-        });
 
-        it('should initialise .pos with the initial positions of elements', function () {
-            var isolateScope = this.isolateScope;
-
-            this.el.find('.item').each( function (i) {
-                expect($(this).width()).to.be.above(0);
-                expect(isolateScope.pos[i]).to.equal(i*100);
-            });
-        });
-
-        it('should initialise .contentWidth', function () {
-            expect(this.isolateScope.contentWidth).to.equal(1000);
-        });
-
-        it('should initialise .itemWidth', function () {
-            expect(this.isolateScope.itemWidth).to.equal(100);
+    describe('scroller', function () {
+        it('should instantiate the scroller', function () {
+            expect(this.SS.Scroller).calledOnce
+                .and.calledWithNew
+                .and.calledWithExactly({
+                    windowWidth: sinon.match.number,
+                    showItemAt:  sinon.match.func,
+                    hideItem:    sinon.match.func,
+                    getItemSize: sinon.match.func
+                });
         });
     });
 });
