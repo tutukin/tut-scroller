@@ -16,18 +16,6 @@
 .tut-scroller a.move-right:active {
   text-decoration: none;
 }
-.tut-scroller a.move-left {
-  right: -2em;
-}
-.tut-scroller a.move-left::before {
-  content: "〉";
-}
-.tut-scroller a.move-right {
-  left: -1em;
-}
-.tut-scroller a.move-right::before {
-  content: "〈";
-}
 .tut-scroller .window {
   overflow: hidden;
   position: relative;

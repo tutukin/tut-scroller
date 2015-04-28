@@ -109,8 +109,8 @@ function ($compile, $templateCache, PM, Scroller) {
             '<div class="window">' +
                 '<div class="items"></div>' +
             '</div>' +
-            '<a href="#" class="move-right"></a>' +
-            '<a href="#" class="move-left"></a>'
+            '<a href="#" class="move-right"><span class="icon"></span></a>' +
+            '<a href="#" class="move-left"><span class="icon"></span></a>'
     };
 }]);
 
