@@ -4,8 +4,10 @@ describe('tutScrollerDirective', function () {
     beforeEach( function () {
         var _this = this;
         this.PM = { attachTo: sinon.stub() };
+
         this.SS = { Scroller: sinon.stub() };
         this.scroller = {
+            setWindowWidth: sinon.spy(),
             scroll: sinon.spy(),
             addItem: sinon.spy(),
             scrollLeft: sinon.spy(),
@@ -14,9 +16,14 @@ describe('tutScrollerDirective', function () {
 
         this.SS.Scroller.returns(this.scroller);
 
+        this.$window = {
+          addEventListener: sinon.stub()
+        };
+
         module( function($provide) {
             $provide.value('PointerMovements', _this.PM);
             $provide.value('Scroller', _this.SS);
+            $provide.value('$window', _this.$window);
         });
     });
 
@@ -112,5 +119,35 @@ describe('tutScrollerDirective', function () {
                     getItemSize: sinon.match.func
                 });
         });
+    });
+
+
+    describe('resze event', function() {
+      it('should attach an event listener to "resize"', function () {
+        expect(this.$window.addEventListener).calledOnce
+          .and.calledWithExactly('resize', sinon.match.func);
+      });
+
+      describe('listener', function () {
+        beforeEach( function () {
+          this.listener = this.$window.addEventListener.firstCall.args[1];
+          this.stub = sinon.stub(jQuery.fn, 'width');
+        });
+
+        afterEach( function () {
+          this.stub.restore();
+        })
+
+        it('should update window width', function () {
+          var width = 600;
+          this.stub.returns(width);
+
+          this.listener();
+
+          expect(this.stub, 'viewport.width()').calledOnce;
+          expect(this.scroller.setWindowWidth, 'scroller.setWindowWidth').calledOnce
+            .and.calledWithExactly(width);
+        });
+      });
     });
 });

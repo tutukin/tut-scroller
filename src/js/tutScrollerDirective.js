@@ -1,6 +1,6 @@
 angular.module('tutScroller').directive('tutScroller',
-['$compile', '$templateCache', 'PointerMovements', 'Scroller',
-function ($compile, $templateCache, PM, Scroller) {
+['$compile', '$templateCache', '$window', 'PointerMovements', 'Scroller',
+function ($compile, $templateCache, $window, PM, Scroller) {
     var defaultTemplateHtml = '<div class="item">{{item}}</div>';
 
     function link (scope, iElement, iAttrs, controller, transcludeFn) {
@@ -23,6 +23,13 @@ function ($compile, $templateCache, PM, Scroller) {
 
         scope.$watch('items', function (a, b) {
             _linkItems();
+        });
+
+        $window.addEventListener('resize', function () {
+          // FIXME: check if windowWidth has changed
+          // FIXME: use requestAnimationFrame to defer DOM manipulations
+          var w = viewport.width();
+          scroller.setWindowWidth(w);
         });
 
         var pointer = PM.attachTo(wrapper, {
