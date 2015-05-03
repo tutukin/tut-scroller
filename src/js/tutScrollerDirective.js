@@ -48,18 +48,12 @@ function ($compile, $templateCache, $window, PM, Scroller) {
 
         iElement.find('a.move-left').on('click', function (ev) {
             var w = scroller.getMeanItemWidth();
-            var head = Math.ceil(0.5*w);
-            var tail = w - head;
-            scroller.scroll(-head);
-            pointer.autoscroll(-tail, Date.now());
+            pointer.autoscroll(-w, Date.now());
         });
 
         iElement.find('a.move-right').on('click', function (ev) {
             var w = scroller.getMeanItemWidth();
-            var head = Math.ceil(0.5*w);
-            var tail = w - head;
-            scroller.scroll(head);
-            pointer.autoscroll(tail, Date.now());
+            pointer.autoscroll(w, Date.now());
         });
 
         function _linkItems () {
