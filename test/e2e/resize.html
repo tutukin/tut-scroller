@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>tutScroller test</title>
+    <link rel="stylesheet/less" href="less/tutScroller.less" type="text/css" media="screen">
+    <link rel="stylesheet/less" href="theme.less" type="text/css" media="screen">
+    <script src="less/dist/less.js" charset="utf-8"></script>
+
+    <style>
+      body {
+        padding: 10%;
+      }
+      .items {
+        height: 20px;
+      }
+      .item {
+        text-align: center;
+      }
+    </style>
+
+  </head>
+  <body ng-app="testTutScroller">
+
+    <div ng-controller="aController">
+      <p>{{selectedItem}}</p>
+      <div
+        tut-scroller="items"
+        tut-scroller-template="item.html"
+        tut-scroller-select="select(item)"
+        style="width:50%"></div>
+    </div>
+
+    <script type="text/ng-template" id="item.html" charset="utf-8">
+      <div class="item" style="width:100px;">{{item}}</div>
+    </script>
+
+
+    <script src="jquery/dist/jquery.js" charset="utf-8"></script>
+    <script src="angular/angular.js" charset="utf-8"></script>
+    <script src="tutScroller.js" charset="utf-8"></script>
+    <script src="js/PointerMovementsService.js" charset="utf-8"></script>
+    <script src="js/ScrollerService.js" charset="utf-8"></script>
+    <script src="js/tutScrollerDirective.js" charset="utf-8"></script>
+
+    <script charset="utf-8">
+      angular.module('testTutScroller', ['tutScroller']).
+      controller('aController', function ($scope) {
+        $scope.selectedItem = '(none)'
+        $scope.items = '0123456789'.split('');
+        $scope.select = function (item) {
+          $scope.$apply( function () {
+            $scope.selectedItem = item;
+          });
+
+        };
+      });
+    </script>
+
+  </body>
+</html>

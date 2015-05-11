@@ -19,6 +19,11 @@ angular.module('tutScroller').factory('Scroller', function () {
         return this._windowWidth;
     };
 
+    p.setWindowWidth = function setWindowWidth (width) {
+      this._windowWidth = width;
+      this.scroll(0);
+    };
+
     p.getContentWidth = function getContentWidth () {
         return this._contentWidth;
     };

@@ -1,8 +1,8 @@
 angular.module('tutScroller', []);
 
 angular.module('tutScroller').directive('tutScroller',
-['$compile', '$templateCache', 'PointerMovements', 'Scroller',
-function ($compile, $templateCache, PM, Scroller) {
+['$compile', '$templateCache', '$window', 'PointerMovements', 'Scroller',
+function ($compile, $templateCache, $window, PM, Scroller) {
     var defaultTemplateHtml = '<div class="item">{{item}}</div>';
 
     function link (scope, iElement, iAttrs, controller, transcludeFn) {
@@ -27,6 +27,13 @@ function ($compile, $templateCache, PM, Scroller) {
             _linkItems();
         });
 
+        $window.addEventListener('resize', function () {
+          // FIXME: check if windowWidth has changed
+          // FIXME: use requestAnimationFrame to defer DOM manipulations
+          var w = viewport.width();
+          scroller.setWindowWidth(w);
+        });
+
         var pointer = PM.attachTo(wrapper, {
             clickThreshold: Math.floor(0.05 * scope.itemWidth) || 8, // Fixme: scope.itemWidth is not available right now
             onmove: function _shift (s) { scroller.scroll(s); },
@@ -43,18 +50,12 @@ function ($compile, $templateCache, PM, Scroller) {
 
         iElement.find('a.move-left').on('click', function (ev) {
             var w = scroller.getMeanItemWidth();
-            var head = Math.ceil(0.5*w);
-            var tail = w - head;
-            scroller.scroll(-head);
-            pointer.autoscroll(-tail, Date.now());
+            pointer.autoscroll(-w, Date.now());
         });
 
         iElement.find('a.move-right').on('click', function (ev) {
             var w = scroller.getMeanItemWidth();
-            var head = Math.ceil(0.5*w);
-            var tail = w - head;
-            scroller.scroll(head);
-            pointer.autoscroll(tail, Date.now());
+            pointer.autoscroll(w, Date.now());
         });
 
         function _linkItems () {
@@ -305,6 +306,11 @@ angular.module('tutScroller').factory('Scroller', function () {
 
     p.getWindowWidth = function getWindowWidth () {
         return this._windowWidth;
+    };
+
+    p.setWindowWidth = function setWindowWidth (width) {
+      this._windowWidth = width;
+      this.scroll(0);
     };
 
     p.getContentWidth = function getContentWidth () {

@@ -69,6 +69,25 @@ describe('ScrollerService', function () {
             });
         });
 
+        describe('#setWindowWidth(width)', function () {
+          it('should be an instance method', function () {
+            expect(this.SS.Scroller).to.respondTo('setWindowWidth');
+          });
+
+          it('should set window width and call #scroll(0)', function () {
+            var oldWidth = this.scroller.getWindowWidth();
+            var newWidth = oldWidth + 100;
+            var spy = sinon.spy(this.scroller, 'scroll');
+
+            this.scroller.setWindowWidth(newWidth);
+
+            expect(this.scroller.getWindowWidth()).to.equal(newWidth);
+            expect(this.scroller.scroll).calledOnce
+                .and.calledWithExactly(0);
+            spy.restore();
+          });
+        });
+
         describe('#getContentWidth()', function () {
             it('should be an instance method', function () {
                 expect(this.SS.Scroller).to.respondTo('getContentWidth');
