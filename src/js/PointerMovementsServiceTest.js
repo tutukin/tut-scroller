@@ -1,4 +1,4 @@
-describe('PointerMovementsService', function () {
+describe.only('PointerMovementsService', function () {
     beforeEach(module('tutScroller'));
 
     beforeEach( function () {
@@ -40,14 +40,14 @@ describe('PointerMovementsService', function () {
 
     describe('.attachTo(target)', function () {
         beforeEach( function () {
-            this.target = {
+            var target = this.target = {
                 on: sinon.spy()
             };
 
-            this.target.on.withArgs('mousedown');
-            this.target.on.withArgs('mousemove');
-            this.target.on.withArgs('mouseup');
-            this.target.on.withArgs('mouseleave');
+            ['mousedown', 'mousemove', 'mouseup', 'mouseleave',
+                'touchstart', 'touchmove', 'touchend'].forEach( function (en) {
+                    target.on.withArgs('mouseleave')
+                });
 
             this.options = {the: 'options'};
 
@@ -88,6 +88,25 @@ describe('PointerMovementsService', function () {
             expect(this.service.tap, 'service.tap()').calledOnce
                 .and.calledOn(this.service)
                 .and.calledWithExactly(this.ev);
+
+            expect(this.target.on.withArgs('touchstart'), 'on("touchstart")').to.not.called;
+        });
+
+        it('should attach both "touchstart" and "mousedown" events if $window.ontouchstart is defined', function () {
+            this.$window.ontouchstart = 'defined';
+            var service = this.PM.attachTo(this.target, this.options);
+
+            expect(this.target.on.withArgs('mousedown'), 'target.on("mousedown")').calledOnce
+                .and.calledWithExactly('mousedown', sinon.match.func);
+            expect(this.target.on.withArgs('touchstart'), 'target.on("touchstart")').calledOnce
+                .and.calledWithExactly('touchstart', sinon.match.func);
+                expect(this.service.tap).not.called;
+
+            this.target.on.withArgs('touchstart').firstCall.args[1](this.ev);
+
+            expect(this.service.tap, 'service.tap()').calledOnce
+                .and.calledOn(this.service)
+                .and.calledWithExactly(this.ev);
         });
 
         it('should bind service.move() to "mousemove" event of the target', function () {
@@ -99,6 +118,26 @@ describe('PointerMovementsService', function () {
             expect(this.service.move).not.called;
 
             this.target.on.withArgs('mousemove').firstCall.args[1](this.ev);
+
+            expect(this.service.move, 'service.move()').calledOnce
+                .and.calledOn(this.service)
+                .and.calledWithExactly(this.ev);
+
+            expect(this.target.on.withArgs('touchmove'), 'target.on("touchmove")').not.called;
+        });
+
+        it('should bind service.move() to both "touchmove" and "mousemove" if $window.ontouchstart is defined', function () {
+            this.$window.ontouchstart = 'defined';
+            var service = this.PM.attachTo(this.target, this.options);
+
+            expect(this.target.on.withArgs('mousemove'), 'target.on("mousemove")').calledOnce
+                .and.calledWithExactly('mousemove', sinon.match.func);
+            expect(this.target.on.withArgs('touchmove'), 'target.on("touchmove")').calledOnce
+                .and.calledWithExactly('touchmove', sinon.match.func);
+
+            expect(this.service.move).not.called;
+
+            this.target.on.withArgs('touchmove').firstCall.args[1](this.ev);
 
             expect(this.service.move, 'service.move()').calledOnce
                 .and.calledOn(this.service)
@@ -134,6 +173,22 @@ describe('PointerMovementsService', function () {
                 .and.calledOn(this.service)
                 .and.calledWithExactly(this.ev);
         });
+
+        it('should bind service.release() to "touchend" event if $window.ontouchstart is defined', function () {
+            this.$window.ontouchstart = 'defined';
+            var service = this.PM.attachTo(this.target, this.options);
+
+            expect(this.target.on.withArgs('touchend'), 'target.on("touchend")').calledOnce
+                .and.calledWithExactly('touchend', sinon.match.func);
+
+            expect(this.service.release).not.called;
+
+            this.target.on.withArgs('touchend').firstCall.args[1](this.ev);
+
+            expect(this.service.release, 'service.release()').calledOnce
+                .and.calledOn(this.service)
+                .and.calledWithExactly(this.ev);
+        });
     });
 
 
@@ -162,6 +217,27 @@ describe('PointerMovementsService', function () {
 
         it('should set clickThreshold from options', function () {
             expect(this.pm.clickThreshold).to.equal(this.clickThreshold);
+        });
+
+        describe('#getX(ev)', function () {
+            it('should be an instance method', function () {
+                expect(this.PM.Movements).to.respondTo('getX');
+            });
+
+            it('should retunr ev.pageX for mouse events', function () {
+                var ev = {pageX: 100};
+                var res = this.pm.getX(ev);
+                expect(res).to.equal(ev.pageX);
+            });
+
+            it('should return clientX of the first target touchpoint', function () {
+                var ev = {
+                    targetTouches: [{clientX: 100}, {clientX: 200}],
+                    pageX: -1
+                };
+                var res = this.pm.getX(ev);
+                expect(res).to.equal(ev.targetTouches[0].clientX);
+            });
         });
 
         describe('#getMaxShift()', function () {
@@ -486,6 +562,6 @@ describe('PointerMovementsService', function () {
         });
 
 
-        
+
     });
 });
