@@ -158,7 +158,13 @@ angular.module('tutScroller').factory('PointerMovements', [
 
     function nop () {}
 
+
+
+
+
     var p = Movements.prototype;
+
+
 
     p._cleanState = function _cleanState () {
         this._state = {
@@ -169,6 +175,8 @@ angular.module('tutScroller').factory('PointerMovements', [
             origin:     null
         };
     };
+
+
 
     p.getX = function getX (ev) {
         touches = ev.targetTouches ?
@@ -182,6 +190,21 @@ angular.module('tutScroller').factory('PointerMovements', [
         }
         return ev.pageX;
     };
+
+
+
+    p.isEventRelevant = function isEventRelevant (ev) {
+        if ( ev === null || typeof ev !== 'object') return false;
+
+        if ( ev.type.substr(0,5) === 'mouse' ) {
+            return ev.which === 1;
+        }
+
+        return true;
+    };
+
+
+
 
     p.getMaxShift = function getMaxShift () {
         return this._state.maxShift;
@@ -202,7 +225,7 @@ angular.module('tutScroller').factory('PointerMovements', [
 
 
     p.tap = function tap (ev) {
-        if ( ! ev || ! ev.which || ev.which !== 1 ) {
+        if ( ! this.isEventRelevant(ev) ) {
             return;
         }
 

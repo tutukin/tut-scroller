@@ -193,6 +193,7 @@ describe.only('PointerMovementsService', function () {
 
 
 
+
     describe('.Movements()', function () {
         beforeEach( function () {
             this.onmove = sinon.spy();
@@ -218,6 +219,9 @@ describe.only('PointerMovementsService', function () {
         it('should set clickThreshold from options', function () {
             expect(this.pm.clickThreshold).to.equal(this.clickThreshold);
         });
+
+
+
 
         describe('#getX(ev)', function () {
             it('should be an instance method', function () {
@@ -252,6 +256,51 @@ describe.only('PointerMovementsService', function () {
             });
         });
 
+
+
+
+        describe('isEventRelevant(ev)', function () {
+            it('should be an instance method', function () {
+                expect(this.PM.Movements).to.respondTo('isEventRelevant');
+            });
+
+            it('should return false if ev is not an object', function () {
+                var fevs = [null, 12, "acv", function () {}, undefined];
+                var pm = this.pm;
+
+                fevs.forEach( function (ev) {
+                    expect(pm.isEventRelevant(ev)).to.be.false;
+                });
+            });
+
+            it('should return false if which!==1 for mouse events', function () {
+                var ev = {
+                    type: 'mousemove',
+                    which: 3
+                };
+                expect(this.pm.isEventRelevant(ev)).to.be.false;
+            });
+
+            it('should return true if which===1 for mouse events', function () {
+                var ev = {
+                    type: 'mousemove',
+                    which: 1
+                };
+                expect(this.pm.isEventRelevant(ev)).to.be.true;
+            });
+
+            it('should return true for touch events', function () {
+                var ev = {
+                    type: 'touchmove',
+                    which: 3
+                };
+                expect(this.pm.isEventRelevant(ev)).to.be.true;
+            });
+        });
+
+
+
+
         describe('#getMaxShift()', function () {
             it('should be an instance method', function () {
                 expect(this.PM.Movements).to.respondTo('getMaxShift');
@@ -261,6 +310,8 @@ describe.only('PointerMovementsService', function () {
                 expect(this.pm.getMaxShift()).to.equal(0);
             });
         });
+
+
 
         describe('#getReference()', function () {
             it('should be an instance method', function () {
@@ -272,6 +323,8 @@ describe.only('PointerMovementsService', function () {
             });
         });
 
+
+
         describe('#getOrigin()', function () {
             it('should be an instance method', function () {
                 expect(this.PM.Movements).to.respondTo('getOrigin');
@@ -281,6 +334,8 @@ describe.only('PointerMovementsService', function () {
                 expect(this.pm.getOrigin()).to.be.null;
             });
         });
+
+
 
         describe('#getVelocity()', function () {
             it('should be an instance method', function () {
@@ -295,11 +350,14 @@ describe.only('PointerMovementsService', function () {
 
 
 
+
         describe('#tap(ev)', function () {
             beforeEach( function () {
                 this.pm._cleanState();
                 this.ev.which = 1;
                 this.ev.pageX = 200;
+                this.ev.type = 'mousedown';
+                this.pm.isEventRelevant = sinon.stub().returns(true);
             });
 
             it('should be an instance method', function () {
@@ -312,8 +370,8 @@ describe.only('PointerMovementsService', function () {
                 expect(this.pm.getOrigin()).to.equal(this.ev.pageX);
             });
 
-            it('should work only for left button', function () {
-                this.ev.which = 2;
+            it('should ignore non-relevant events', function () {
+                this.pm.isEventRelevant.returns(false);
                 this.pm.tap(this.ev);
                 expect(this.pm.getReference()).to.be.null;
                 expect(this.pm.getOrigin()).to.be.null;
@@ -331,6 +389,7 @@ describe.only('PointerMovementsService', function () {
         describe('#move(ev)', function () {
             beforeEach( function () {
                 this.pm._cleanState();
+                this.pm.isEventRelevant = sinon.stub().returns(true);
 
                 this.ev.pageX = 100;
                 this.pm.tap(this.ev);
@@ -411,6 +470,7 @@ describe.only('PointerMovementsService', function () {
         describe('#release(ev)', function () {
             beforeEach( function () {
                 this.pm._cleanState();
+                this.pm.isEventRelevant = sinon.stub().returns(true);
                 this.pm.autoscroll = sinon.spy();
                 this.ev.pageX = 100;
                 this.pm.tap(this.ev);
