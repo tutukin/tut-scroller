@@ -537,9 +537,9 @@ describe.only('PointerMovementsService', function () {
                         .and.calledWithExactly(target);
                 });
 
-                it('should not call the onclick if ev.type is not "mouseup"', function () {
+                it('should not call the onclick if ev.type is "mouseleave"', function () {
                     var target = this.ev.target = {an: 'event target'};
-                    this.ev.type = 'mousemove';
+                    this.ev.type = 'mouseleave';
                     this.pm.release(this.ev);
                     expect(this.onclick, 'onclick()').not.called;
                 });

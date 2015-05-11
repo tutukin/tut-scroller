@@ -273,7 +273,8 @@ angular.module('tutScroller').factory('PointerMovements', [
                 this.onmove(this._state.origin - this._state.reference);
             }
 
-            if ( ev.type === 'mouseup' && typeof this.onclick === 'function' ) {
+            // TODO: This mouseleave check looks a bit ugly! Should not it be treated separately?
+            if ( ev.type !== 'mouseleave' && typeof this.onclick === 'function' ) {
                 this.onclick(ev.target);
             }
         }
