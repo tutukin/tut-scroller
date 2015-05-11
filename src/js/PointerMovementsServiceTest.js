@@ -238,6 +238,18 @@ describe.only('PointerMovementsService', function () {
                 var res = this.pm.getX(ev);
                 expect(res).to.equal(ev.targetTouches[0].clientX);
             });
+
+            it('should recognize touch events wrapped in jQuery', function () {
+                var touches = [{clientX: 100}, {clientX: 200}];
+                var ev = {
+                    originalEvent: {
+                        targetTouches: touches
+                    },
+                    pageX: -1
+                };
+                var res = this.pm.getX(ev);
+                expect(res).to.equal(touches[0].clientX);
+            });
         });
 
         describe('#getMaxShift()', function () {

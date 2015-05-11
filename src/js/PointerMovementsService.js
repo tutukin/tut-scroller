@@ -54,8 +54,14 @@ angular.module('tutScroller').factory('PointerMovements', [
     };
 
     p.getX = function getX (ev) {
-        if ( ev.targetTouches && ev.targetTouches.length > 0 ) {
-            return ev.targetTouches[0].clientX;
+        touches = ev.targetTouches ?
+            ev.targetTouches :
+            ev.originalEvent ?
+                ev.originalEvent.targetTouches :
+                null;
+
+        if ( touches && touches.length > 0 ) {
+            return touches[0].clientX;
         }
         return ev.pageX;
     };
