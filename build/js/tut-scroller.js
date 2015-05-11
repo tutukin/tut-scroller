@@ -122,23 +122,30 @@ angular.module('tutScroller').factory('PointerMovements', [
     function attachTo (target, options) {
         var service = new this.Movements(options);
 
-        target.on('mousedown', function (ev) {
-            return service.tap(ev);
-        });
+        if ( typeof $window.ontouchstart !== 'undefined' ) {
+            target.on('touchstart', tap);
+            target.on('touchmove', move);
+            target.on('touchend', release);
+        }
 
-        target.on('mousemove', function (ev) {
-            return service.move(ev);
-        });
-
-        target.on('mouseup', function (ev) {
-            return service.release(ev);
-        });
-
-        target.on('mouseleave', function (ev) {
-            return service.release(ev);
-        });
+        target.on('mousedown', tap);
+        target.on('mousemove', move);
+        target.on('mouseup', release);
+        target.on('mouseleave',release);
 
         return service;
+
+        function tap (ev) {
+            return service.tap(ev);
+        }
+
+        function move (ev) {
+            return service.move(ev);
+        }
+
+        function release (ev) {
+            return service.release(ev);
+        }
     }
 
     function Movements (options) {
@@ -161,6 +168,13 @@ angular.module('tutScroller').factory('PointerMovements', [
             reference:  null,
             origin:     null
         };
+    };
+
+    p.getX = function getX (ev) {
+        if ( ev.targetTouches && ev.targetTouches.length > 0 ) {
+            return ev.targetTouches[0].clientX;
+        }
+        return ev.pageX;
     };
 
     p.getMaxShift = function getMaxShift () {
@@ -186,7 +200,7 @@ angular.module('tutScroller').factory('PointerMovements', [
             return;
         }
 
-        this._state.origin = this._state.reference = ev.pageX;
+        this._state.origin = this._state.reference = this.getX(ev);
         this._state.maxShift = 0;
 
         this._state.timestamp = Date.now();
@@ -201,12 +215,13 @@ angular.module('tutScroller').factory('PointerMovements', [
             return;
         }
 
-        var dist = ev.pageX - this._state.reference;
+        var x = this.getX(ev);
+        var dist = x - this._state.reference;
         if ( typeof this.onmove === 'function' ) {
             this.onmove(dist);
         }
 
-        var shift = Math.abs(ev.pageX - this._state.origin);
+        var shift = Math.abs(x - this._state.origin);
         this._state.maxShift = shift > this._state.maxShift ?
             shift : this._state.maxShift;
 
@@ -215,7 +230,7 @@ angular.module('tutScroller').factory('PointerMovements', [
         this._state.velocity = 0.8*v + 0.2*this._state.velocity;
         this._state.timestamp = timestamp;
 
-        this._state.reference = ev.pageX;
+        this._state.reference = x;
 
         return _stopEvent(ev);
     }
