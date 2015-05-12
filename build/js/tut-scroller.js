@@ -116,8 +116,11 @@ function ($compile, $templateCache, $window, PM, Scroller) {
 }]);
 
 angular.module('tutScroller').factory('PointerMovements', [
-    '$window',
-    function ($window) {
+    '$window', '$document', '$timeout',
+    function ($window, $document, $timeout) {
+
+        var WHEEL_TIMEOUT = 50;
+        var WHEEL_DELTA = 3;
 
     function attachTo (target, options) {
         var service = new this.Movements(options);
@@ -133,6 +136,14 @@ angular.module('tutScroller').factory('PointerMovements', [
         target.on('mouseup', release);
         target.on('mouseleave',release);
 
+        var wheelEvName =
+            'onwheel' in $document[0] ?
+                'wheel' :
+            'onmousewheel' in $document[0] ?
+                'mousewheel' : 'MozMousePixelScroll';
+
+        target.on(wheelEvName, wheel);
+
         return service;
 
         function tap (ev) {
@@ -145,6 +156,10 @@ angular.module('tutScroller').factory('PointerMovements', [
 
         function release (ev) {
             return service.release(ev);
+        }
+
+        function wheel (ev) {
+            return service.wheel(ev);
         }
     }
 
@@ -172,7 +187,9 @@ angular.module('tutScroller').factory('PointerMovements', [
             velocity:   0,
             timestamp:  null,
             reference:  null,
-            origin:     null
+            origin:     null,
+            scroll:     0,
+            wheelTimer: null
         };
     };
 
@@ -188,13 +205,32 @@ angular.module('tutScroller').factory('PointerMovements', [
         if ( touches && touches.length > 0 ) {
             return touches[0].clientX;
         }
-        return ev.pageX;
+
+        return typeof ev.pageX === 'number' ?
+                ev.pageX :
+            typeof ev.originalEvent.pageX === 'number' ?
+                ev.originalEvent.pageX :
+                undefined;
+    };
+
+
+    p.getDeltaX = function getDeltaX (ev) {
+        return typeof ev.deltaX === 'number' ?
+                ev.deltaX :
+            typeof ev.originalEvent.deltaX === 'number' ?
+                ev.originalEvent.deltaX : undefined;
     };
 
 
 
     p.isEventRelevant = function isEventRelevant (ev) {
+        var value;
         if ( ev === null || typeof ev !== 'object') return false;
+
+        if ( ev.type.match(/wheel/) || ev.type === 'MozMousePixelScroll' ) {
+            value = this.getDeltaX(ev) || 0;
+            return value !== 0;
+        }
 
         if ( ev.type.substr(0,5) === 'mouse' ) {
             return ev.which === 1;
@@ -218,6 +254,14 @@ angular.module('tutScroller').factory('PointerMovements', [
         return this._state.origin;
     };
 
+    p.getScroll = function getScroll () {
+        return this._state.scroll;
+    };
+
+    p.getWheelReleaseTimer = function getWheelReleaseTimer () {
+        return this._state.wheelTimer;
+    };
+
     p.getVelocity = function getVelocity () {
         return this._state.velocity;
     };
@@ -229,12 +273,16 @@ angular.module('tutScroller').factory('PointerMovements', [
             return;
         }
 
-        this._state.origin = this._state.reference = this.getX(ev);
-        this._state.maxShift = 0;
-
-        this._state.timestamp = Date.now();
+        var x = this.getX(ev);
+        this._tap(x);
 
         return _stopEvent(ev);
+    };
+
+    p._tap = function _tap (x) {
+        this._state.origin = this._state.reference = x;
+        this._state.maxShift = 0;
+        this._state.timestamp = Date.now();
     };
 
 
@@ -244,7 +292,17 @@ angular.module('tutScroller').factory('PointerMovements', [
             return;
         }
 
+        if ( 0 !== this._state.scroll || null !== this._state.wheelTimer ) {
+            return _stopEvent(ev);
+        }
+
         var x = this.getX(ev);
+        this._move(x);
+        return _stopEvent(ev);
+    };
+
+
+    p._move = function _move(x) {
         var dist = x - this._state.reference;
         if ( typeof this.onmove === 'function' ) {
             this.onmove(dist);
@@ -260,22 +318,27 @@ angular.module('tutScroller').factory('PointerMovements', [
         this._state.timestamp = timestamp;
 
         this._state.reference = x;
-
-        return _stopEvent(ev);
-    }
+    };
 
 
 
     p.release = function release (ev) {
+        var target = ev.type !== 'mouseleave' ? ev.target : null;
+        this._release(target);
+        return _stopEvent(ev);
+    };
+
+
+
+    p._release = function _release (target) {
         var v;
         if ( this._state.maxShift < this.clickThreshold ) {
             if ( typeof this.onmove === 'function' ) {
                 this.onmove(this._state.origin - this._state.reference);
             }
 
-            // TODO: This mouseleave check looks a bit ugly! Should not it be treated separately?
-            if ( ev.type !== 'mouseleave' && typeof this.onclick === 'function' ) {
-                this.onclick(ev.target);
+            if ( target && typeof this.onclick === 'function' ) {
+                this.onclick(target);
             }
         }
         else {
@@ -286,8 +349,42 @@ angular.module('tutScroller').factory('PointerMovements', [
         }
 
         this._cleanState();
-        return _stopEvent(ev);
     }
+
+
+    p.wheel = function wheel (ev) {
+        if ( ! this.isEventRelevant(ev) ) {
+            return _stopEvent(ev);
+        }
+
+        if ( typeof this._state.reference !== 'number' ) {
+            this._tap( this.getX(ev) );
+            this._startWheelReleaseTimer();
+        }
+
+        var dx = this.getDeltaX(ev) < 0 ?
+            -WHEEL_DELTA : WHEEL_DELTA;
+        this._state.scroll += dx; // FIXME: very ugly state manipulation\
+
+        return _stopEvent(ev);
+    };
+
+
+    p._startWheelReleaseTimer = function _startWheelReleaseTimer () {
+        var _this = this;
+
+        this._state.wheelTimer = $timeout(function () {
+            if ( _this._state.scroll === 0 ) {
+                return _this._release();
+            }
+
+            var newRef = _this._state.reference + _this._state.scroll;
+            _this._move(newRef);
+            _this._state.reference = newRef;
+            _this._state.scroll = 0;
+            _this._startWheelReleaseTimer();
+        }, WHEEL_TIMEOUT, false);
+    };
 
 
     p.autoscroll = function autoscroll (amplitude, t0, prevShift) {
