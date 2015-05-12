@@ -1,4 +1,4 @@
-describe.only('PointerMovementsService', function () {
+describe('PointerMovementsService', function () {
     beforeEach(module('tutScroller'));
 
     beforeEach( function () {
@@ -8,8 +8,16 @@ describe.only('PointerMovementsService', function () {
             requestAnimationFrame: sinon.spy()
         };
 
+        this.$document = [{}];
+
+        this.thenable = { then: sinon.stub() };
+        this.$timeout = sinon.stub().returns(this.thenable);
+        this.$timeout.cancel = sinon.spy();
+
         module( function($provide) {
             $provide.value('$window', _this.$window);
+            $provide.value('$document', _this.$document);
+            $provide.value('$timeout', _this.$timeout);
         });
     });
 
@@ -38,6 +46,7 @@ describe.only('PointerMovementsService', function () {
 
 
 
+    // FIXME: test suite smells!
     describe('.attachTo(target)', function () {
         beforeEach( function () {
             var target = this.target = {
@@ -45,8 +54,10 @@ describe.only('PointerMovementsService', function () {
             };
 
             ['mousedown', 'mousemove', 'mouseup', 'mouseleave',
-                'touchstart', 'touchmove', 'touchend'].forEach( function (en) {
-                    target.on.withArgs('mouseleave')
+                'touchstart', 'touchmove', 'touchend',
+                'wheel', 'mousewheel', 'MozMousePixelScroll',
+                'onmousewheel'].forEach( function (en) {
+                    target.on.withArgs(en);
                 });
 
             this.options = {the: 'options'};
@@ -54,7 +65,8 @@ describe.only('PointerMovementsService', function () {
             this.service = {
                 tap:    sinon.spy(),
                 move:   sinon.spy(),
-                release:sinon.spy()
+                release:sinon.spy(),
+                wheel:  sinon.spy()
             };
 
             this.PM.Movements = sinon.stub().returns(this.service);
@@ -189,6 +201,36 @@ describe.only('PointerMovementsService', function () {
                 .and.calledOn(this.service)
                 .and.calledWithExactly(this.ev);
         });
+
+        it('should bind service.wheel() to one of "wheel", "mousewheel", "MozMousePixelScroll"', function () {
+            this.$document[0].onwheel = null;
+            var service = this.PM.attachTo(this.target, this.options);
+            expect(this.target.on.withArgs('wheel')).calledOnce
+                .and.calledWithExactly('wheel', sinon.match.func);
+            this.target.on.withArgs('wheel').firstCall.args[1](this.ev);
+
+            expect(this.service.wheel, 'service.wheel()').calledOnce
+                .and.calledWithExactly(this.ev);
+
+            delete this.$document[0].onwheel;
+            this.$document[0].onmousewheel = null;
+            this.service.wheel.reset();
+            service = this.PM.attachTo(this.target, this.options);
+            expect(this.target.on.withArgs('mousewheel')).calledOnce
+                .and.calledWithExactly('mousewheel', sinon.match.func);
+            this.target.on.withArgs('mousewheel').firstCall.args[1](this.ev);
+            expect(this.service.wheel, 'service.wheel()').calledOnce
+                .and.calledWithExactly(this.ev);
+
+            delete this.$document[0].onmousewheel;
+            this.service.wheel.reset();
+            service = this.PM.attachTo(this.target, this.options);
+            expect(this.target.on.withArgs('MozMousePixelScroll')).calledOnce
+                .and.calledWithExactly('MozMousePixelScroll', sinon.match.func);
+            this.target.on.withArgs('MozMousePixelScroll').firstCall.args[1](this.ev);
+            expect(this.service.wheel, 'service.wheel()').calledOnce
+                .and.calledWithExactly(this.ev);
+        });
     });
 
 
@@ -222,16 +264,37 @@ describe.only('PointerMovementsService', function () {
 
 
 
+        describe('#getDeltaX(ev)', function () {
+            it('should be an instance method', function () {
+                expect(this.PM.Movements).to.respondTo('getDeltaX');
+            });
+
+            it('should return ev.deltaX', function () {
+                expect(this.pm.getDeltaX({deltaX: 100})).to.equal(100);
+            });
+
+            it('should respect jQuery events', function () {
+                expect(this.pm.getDeltaX({originalEvent: {deltaX: 100}})).to.equal(100);
+            });
+        });
+
+
 
         describe('#getX(ev)', function () {
             it('should be an instance method', function () {
                 expect(this.PM.Movements).to.respondTo('getX');
             });
 
-            it('should retunr ev.pageX for mouse events', function () {
+            it('should return ev.pageX for mouse events', function () {
                 var ev = {pageX: 100};
                 var res = this.pm.getX(ev);
                 expect(res).to.equal(ev.pageX);
+            });
+
+            it('should recognize jQuery events', function () {
+                var ev = {originalEvent: {pageX: 100}};
+                var res = this.pm.getX(ev);
+                expect(res).to.equal(ev.originalEvent.pageX);
             });
 
             it('should return clientX of the first target touchpoint', function () {
@@ -296,6 +359,33 @@ describe.only('PointerMovementsService', function () {
                 };
                 expect(this.pm.isEventRelevant(ev)).to.be.true;
             });
+
+            it('should return flase for wheel events if deltaX is 0', function () {
+                var ev = {deltaX: 0};
+                var pm = this.pm;
+                'wheel,mousewheel,MozMousePixelScroll'.split(',').forEach(function (type) {
+                    ev.type = type;
+                    expect(pm.isEventRelevant(ev)).to.be.false;
+                });
+            });
+
+            it('should return true for wheel events when deltaX is not 0', function () {
+                var ev = {};
+                var pm = this.pm;
+                'wheel,mousewheel,MozMousePixelScroll'.split(',').forEach(function (type, k) {
+                    ev.type = type;
+                    ev.deltaX = 2*(k+1)*Math.pow(-1, k); // positive and negative numbers %-)
+                    expect(pm.isEventRelevant(ev)).to.be.true;
+                });
+            });
+
+            it('should recognize jQuery events', function () {
+                var ev = {type: 'wheel', originalEvent: {deltaX: 0}};
+                expect(this.pm.isEventRelevant(ev)).to.be.false;
+
+                ev.originalEvent.deltaX = -10;
+                expect(this.pm.isEventRelevant(ev)).to.be.true;
+            });
         });
 
 
@@ -332,6 +422,29 @@ describe.only('PointerMovementsService', function () {
 
             it('should return null by default', function () {
                 expect(this.pm.getOrigin()).to.be.null;
+            });
+        });
+
+
+
+        describe('#getScroll()', function () {
+            it('should be an instance method', function () {
+                expect(this.PM.Movements).to.respondTo('getScroll');
+            });
+
+            it('should return 0 by default', function () {
+                expect( this.pm.getScroll() ).to.equal(0);
+            });
+        });
+
+
+        describe('#getWheelReleaseTimer()', function () {
+            it('should be an instance method', function () {
+                expect(this.PM.Movements).to.respondTo('getWheelReleaseTimer');
+            });
+
+            it('should return null by default', function () {
+                expect(this.pm.getWheelReleaseTimer()).to.be.null;
             });
         });
 
@@ -418,6 +531,14 @@ describe.only('PointerMovementsService', function () {
                 this.pm._cleanState();
                 this.pm.move(this.ev);
                 expect(this.pm.getReference()).to.be.null;
+            });
+
+            it('should do nothing if wheel scrolling is active', function () {
+                var spy = sinon.spy(this.pm, 'getX');
+                this.pm._state.wheelTimer = {};
+                this.pm.move(this.ev);
+                expect(spy).not.called;
+                spy.restore();
             });
 
             it('should stop event', function () {
@@ -551,6 +672,130 @@ describe.only('PointerMovementsService', function () {
                 });
             });
         });
+
+
+
+        describe('#wheel(ev)', function () {
+            beforeEach( function () {
+                this.pm._cleanState();
+                this.pm.isEventRelevant = sinon.stub().returns(true);
+                this.pm._tap = sinon.spy();
+                this.pm._move = sinon.spy();
+                this.pm.release = sinon.spy();
+                this.pm._startWheelReleaseTimer = sinon.spy();
+                this.pm.getOrigin = sinon.stub();
+
+                this.ev.$reset();
+                this.ev.deltaX = 1;
+                this.ev.pageX = 100;
+                this.ev.type = 'wheel';
+
+                this.X = 200;
+                this.pm.getX = sinon.stub().withArgs(this.ev).returns(this.X);
+            });
+
+            it('should be an instance method', function () {
+                expect(this.PM.Movements).to.respondTo('wheel');
+            });
+
+            it('should call #_tap and start wheel release timer if reference is not set yet', function () {
+                this.pm._state.reference = null;
+
+                this.pm.wheel(this.ev);
+
+                expect(this.pm._tap, 'pm._tap()').calledOnce
+                    .and.calledWithExactly(this.X);
+                expect(this.pm._startWheelReleaseTimer, 'pm._startWheelReleaseTimer()').calledOnce
+                    .and.calledWithExactly();
+            });
+
+            it('should should do nothing if event is non-relevant', function () {
+                this.pm.isEventRelevant.returns(false);
+                this.pm.wheel(this.ev);
+                expect(this.pm._startWheelReleaseTimer, 'pm._startWheelReleaseTimer()')
+                    .not.called;
+            });
+
+            it('should update scroll value', function () {
+                this.pm._state.scroll = 0;
+                this.pm.wheel(this.ev);
+                expect(this.pm._state.scroll).to.not.equal(0);
+            });
+
+            it('should stop event', function () {
+                this.pm.wheel(this.ev);
+                expect(this.ev.preventDefault).calledOnce;
+                expect(this.ev.stopPropagation).calledOnce;
+            });
+        });
+
+
+
+        describe('#_startWheelReleaseTimer(ev)', function () {
+            beforeEach( function () {
+                this.ev = {
+                    type: 'wheel',
+                    pageX: 100,
+                    deltaX: 200
+                };
+                this.pm._tap = sinon.spy();
+            });
+
+            it('should be an instance method', function () {
+                expect(this.PM.Movements).to.respondTo('_startWheelReleaseTimer');
+            });
+
+            it('should start wheelTimer', function () {
+                this.pm._startWheelReleaseTimer(this.ev);
+
+                expect(this.$timeout, '$timeout()').calledOnce
+                    .and.calledWithExactly(sinon.match.func, sinon.match.number, false);
+            });
+
+            describe('timeout function', function () {
+                beforeEach( function () {
+                    this.pm._release = sinon.spy();
+                    this.pm._move = sinon.spy();
+                    this.pm._startWheelReleaseTimer(this.ev);
+                    this.callback = this.$timeout.firstCall.args[0];
+                });
+
+                it('should call #_release without arguments if scroll is 0', function () {
+                    this.pm._state.scroll = 0;
+                    this.callback();
+                    expect(this.pm._release, 'pm._release()').calledOnce
+                        .and.calledWithExactly();
+                });
+
+                it('should call #_move if scroll is not 0', function () {
+                    var scroll = this.pm._state.scroll = 10;
+                    var reference = this.pm._state.reference = 20;
+                    this.callback();
+
+                    expect(this.pm._move, 'pm._move()').calledOnce
+                        .and.calledWithExactly(scroll+reference);
+                });
+
+                it('should update reference and reset scroll if the latter is not 0', function () {
+                    var scroll = this.pm._state.scroll = 10;
+                    var reference = this.pm._state.reference = 20;
+                    this.callback();
+
+                    expect(this.pm._state.reference).to.equal(scroll+reference);
+                    expect(this.pm._state.scroll).to.equal(0);
+                });
+
+                it('should restart wheel release timer', function () {
+                    var spy = this.pm._startWheelReleaseTimer = sinon.spy();
+                    var scroll = this.pm._state.scroll = 10;
+                    var reference = this.pm._state.reference = 20;
+                    this.callback();
+
+                    expect(spy).calledOnce.and.calledWithExactly();
+                });
+            });
+        });
+
 
 
         describe('#autoscroll(amplitude, time, prevShift)', function () {
