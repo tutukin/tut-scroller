@@ -262,6 +262,10 @@ describe('PointerMovementsService', function () {
             expect(this.pm.clickThreshold).to.equal(this.clickThreshold);
         });
 
+        it('should set .mode to "x" by default', function () {
+            expect(this.pm.mode).to.equal('x');
+        });
+
 
 
         describe('#getDeltaX(ev)', function () {
@@ -280,42 +284,38 @@ describe('PointerMovementsService', function () {
 
 
 
-        describe('#getX(ev)', function () {
+        describe('#getXY(ev)', function () {
             it('should be an instance method', function () {
-                expect(this.PM.Movements).to.respondTo('getX');
+                expect(this.PM.Movements).to.respondTo('getXY');
             });
 
-            it('should return ev.pageX for mouse events', function () {
-                var ev = {pageX: 100};
-                var res = this.pm.getX(ev);
-                expect(res).to.equal(ev.pageX);
+            it('should return [ev.pageX, eb.pageY] for mouse events', function () {
+                var ev = {pageX: 100, pageY: 200};
+                var res = this.pm.getXY(ev);
+                expect(res).to.deep.equal([ev.pageX, ev.pageY]);
             });
 
-            it('should recognize jQuery events', function () {
-                var ev = {originalEvent: {pageX: 100}};
-                var res = this.pm.getX(ev);
-                expect(res).to.equal(ev.originalEvent.pageX);
-            });
-
-            it('should return clientX of the first target touchpoint', function () {
+            it('should return [clientX, clientY] of the first target touchpoint', function () {
                 var ev = {
-                    targetTouches: [{clientX: 100}, {clientX: 200}],
-                    pageX: -1
+                    targetTouches: [{clientX: 100, clientY: 200}, {clientX: 300, clientY: 400}],
+                    pageX: -1, pageY: -1
                 };
-                var res = this.pm.getX(ev);
-                expect(res).to.equal(ev.targetTouches[0].clientX);
+
+                var res = this.pm.getXY(ev);
+                expect(res).to.deep.equal([ev.targetTouches[0].clientX, ev.targetTouches[0].clientY]);
             });
 
             it('should recognize touch events wrapped in jQuery', function () {
-                var touches = [{clientX: 100}, {clientX: 200}];
+                var touches = [{clientX: 100, clientY: 200}, {clientX: 300, clientY: 400}];
                 var ev = {
                     originalEvent: {
                         targetTouches: touches
                     },
-                    pageX: -1
+                    pageX: -1, pageY: -1
                 };
-                var res = this.pm.getX(ev);
-                expect(res).to.equal(touches[0].clientX);
+                var res = this.pm.getXY(ev);
+
+                expect(res).to.deep.equal([touches[0].clientX, touches[0].clientY]);
             });
         });
 
@@ -396,8 +396,8 @@ describe('PointerMovementsService', function () {
                 expect(this.PM.Movements).to.respondTo('getMaxShift');
             });
 
-            it('should return 0 by default', function () {
-                expect(this.pm.getMaxShift()).to.equal(0);
+            it('should return [0, 0] by default', function () {
+                expect(this.pm.getMaxShift()).to.deep.equal([0, 0]);
             });
         });
 
@@ -455,9 +455,74 @@ describe('PointerMovementsService', function () {
                 expect(this.PM.Movements).to.respondTo('getVelocity');
             });
 
-            it('should return 0 by default', function () {
+            it('should return [0, 0] by default', function () {
                 var v = this.pm.getVelocity();
-                expect(v).to.equal(0);
+                expect(v).to.deep.equal([0, 0]);
+            });
+        });
+
+
+
+
+        describe('#isVelocityAbove(v)', function () {
+            beforeEach( function () {
+                this.v = [100, 200];
+                this.stub = sinon.stub(this.pm, 'getVelocity').returns(this.v);
+            });
+
+            afterEach( function () {
+                this.stub.restore();
+            });
+
+            it('should be an instance method', function () {
+                expect(this.PM.Movements).to.respondTo('isVelocityAbove');
+            });
+
+            it('should return (vx > v) in x mode', function () {
+                var v = this.v[0];
+                expect( this.pm.isVelocityAbove(v) ).to.be.false;
+                expect( this.pm.isVelocityAbove(v-0.001) ).to.be.true;
+            });
+
+            it('should return (vy > v) in y mode', function () {
+                this.pm.mode = 'y';
+                var v = this.v[1];
+
+                expect( this.pm.isVelocityAbove(v) ).to.be.false;
+                expect( this.pm.isVelocityAbove(v-0.001) ).to.be.true;
+            });
+
+            it('should return (vx^2 + vy^2 > v^2) in y mode', function () {
+                this.pm.mode = 'xy';
+                var vxy = this.v;
+                var v = Math.sqrt(vxy[0]*vxy[0] + vxy[1]*vxy[1]);
+
+                expect( this.pm.isVelocityAbove(v) ).to.be.false;
+                expect( this.pm.isVelocityAbove(v-0.001) ).to.be.true;
+            });
+
+        });
+
+
+
+
+        describe('#isShiftAbove(s)', function () {
+            beforeEach( function () {
+                this.maxShift = [100, 200];
+                this.pm.getMaxShift = sinon.stub().returns(this.maxShift);
+            });
+
+            it('should be an instance method', function () {
+                expect(this.PM.Movements).to.respondTo('isShiftAbove');
+            });
+
+            it('should return maxShift.x^2 + maxShift.y^2 > s^2', function () {
+                var x = this.maxShift[0];
+                var y = this.maxShift[1];
+                var s = Math.sqrt(x*x + y*y);
+
+                expect( this.pm.isShiftAbove(s) ).to.be.false;
+                expect( this.pm.isShiftAbove(s-0.00001) ).to.be.true;
             });
         });
 
@@ -467,20 +532,13 @@ describe('PointerMovementsService', function () {
         describe('#tap(ev)', function () {
             beforeEach( function () {
                 this.pm._cleanState();
-                this.ev.which = 1;
-                this.ev.pageX = 200;
-                this.ev.type = 'mousedown';
                 this.pm.isEventRelevant = sinon.stub().returns(true);
+                this.XY = [100, 200];
+                this.pm.getXY = sinon.stub().returns(this.XY);
             });
 
             it('should be an instance method', function () {
                 expect(this.PM.Movements).to.respondTo('tap');
-            });
-
-            it('should set reference and origin to ev.pageX', function () {
-                this.pm.tap(this.ev);
-                expect(this.pm.getReference()).to.equal(this.ev.pageX);
-                expect(this.pm.getOrigin()).to.equal(this.ev.pageX);
             });
 
             it('should ignore non-relevant events', function () {
@@ -489,6 +547,16 @@ describe('PointerMovementsService', function () {
                 expect(this.pm.getReference()).to.be.null;
                 expect(this.pm.getOrigin()).to.be.null;
             });
+
+
+            it('should set reference and origin to #getXY(ev)', function () {
+                this.pm.tap(this.ev);
+                expect(this.pm.getReference()).to.deep.equal(this.XY);
+                expect(this.pm.getOrigin()).to.deep.equal(this.XY);
+                expect(this.pm.getXY, 'pm.getXY()').calledOnce
+                    .and.calledWithExactly(this.ev);
+            });
+
 
             it('should stop event', function () {
                 this.pm.tap(this.ev);
@@ -504,27 +572,31 @@ describe('PointerMovementsService', function () {
                 this.pm._cleanState();
                 this.pm.isEventRelevant = sinon.stub().returns(true);
 
-                this.ev.pageX = 100;
+                this.XY0 = [100, 200];
+                this.XY  = [200, 500];
+                this.pm.getXY = sinon.stub();
+                this.pm.getXY.onCall(0).returns(this.XY0);
+                this.pm.getXY.onCall(1).returns(this.XY);
+
                 this.pm.tap(this.ev);
                 this.ev.$reset();
 
-                this.ev.pageX = 200;
             });
 
             it('should be an instance method', function () {
                 expect(this.PM.Movements).to.respondTo('move');
             });
 
-            it('should call "move" listener with the shift = pageX - reference', function () {
+            it('should call "move" listener with the dx, dy (ev.pos - reference)', function () {
                 this.pm.move(this.ev);
 
                 expect(this.onmove, 'onmove()').calledOnce
-                    .and.calledWithExactly(100);
+                    .and.calledWithExactly(this.XY[0]-this.XY0[0], this.XY[1] - this.XY0[1]);
             });
 
-            it('should move reference to pageX', function () {
+            it('should move reference to the event position', function () {
                 this.pm.move(this.ev);
-                expect(this.pm.getReference()).to.equal(this.ev.pageX);
+                expect(this.pm.getReference()).to.deep.equal(this.XY);
             });
 
             it('should do nothing if no mousedown event occured before', function () {
@@ -547,40 +619,62 @@ describe('PointerMovementsService', function () {
                 expect(this.ev.stopPropagation).called;
             });
 
-            it('should calculate the maxShift', function () {
+            it('should calculate the maxShift (x, y)', function () {
                 var _this = this;
+                _this.pm.getXY = sinon.stub();
 
-                [110, 90, 80, 112].forEach( function (x) {
-                    _this.ev.pageX = x;
+                [[110, 220], [90, 180], [80, 160], [112, 224]].forEach( function (xy) {
+                    _this.pm.getXY.returns(xy);
                     _this.pm.move(_this.ev);
                 });
 
-                expect(this.pm.getMaxShift()).to.equal(20);
+                expect(this.pm.getMaxShift()).to.deep.equal([20, 40]);
             });
 
             it('should update velocity', function () {
-                this.pm._cleanState;
+                this.pm._cleanState; // NOTE: first employ fake timers, second - do the calculations
+
                 var clock = sinon.useFakeTimers();
-                var v = 0;
+                var dxy = [10, 20];
+                var dt  = 500; // ms
+                var xy = [this.XY0[0] + dxy[0], this.XY0[1] + dxy[1]];
+                var v = [0, 0];
                 var vx, ve;
 
-                this.ev.pageX = 100;
+                this.pm.getXY = sinon.stub().returns(this.XY0);
                 this.pm.tap(this.ev);
-                clock.tick(500);
-                this.ev.pageX += 10;
-                this.pm.move(this.ev);
-                vx = Math.ceil(this.pm.getVelocity());
-                ve = Math.ceil(0.8*1000*10/501 + 0.2*v);
 
-                expect(vx).to.equal(ve);
+                clock.tick(dt);
+                this.pm.getXY.returns(xy);
+                this.pm.move(this.ev);
+
+                vx = this.pm.getVelocity();
+                vx[0] = Math.ceil(vx[0]);
+                vx[1] = Math.ceil(vx[1]);
+
+                ve = [
+                    Math.ceil(0.8*1000*dxy[0]/(1+dt) + 0.2*v[0]),
+                    Math.ceil(0.8*1000*dxy[1]/(1+dt) + 0.2*v[1])
+                ];
+
+                expect(vx).to.deep.equal(ve);
 
                 v=vx;
-                clock.tick(500)
-                this.ev.pageX += 10;
+                clock.tick(dt)
+                xy = [xy[0] + dxy[0], xy[1] + dxy[1]];
+                this.pm.getXY.returns(xy);
                 this.pm.move(this.ev);
+
                 vx = this.pm.getVelocity();
-                vx = Math.ceil(this.pm.getVelocity());
-                ve = Math.ceil(0.8*1000*10/501 + 0.2*v);
+                vx[0] = Math.ceil(vx[0]);
+                vx[1] = Math.ceil(vx[1]);
+
+                ve = [
+                    Math.ceil(0.8*1000*dxy[0]/(1+dt) + 0.2*v[0]),
+                    Math.ceil(0.8*1000*dxy[1]/(1+dt) + 0.2*v[1])
+                ];
+
+                expect(vx).to.deep.equal(ve);
 
                 clock.restore();
             });
@@ -593,36 +687,33 @@ describe('PointerMovementsService', function () {
                 this.pm._cleanState();
                 this.pm.isEventRelevant = sinon.stub().returns(true);
                 this.pm.autoscroll = sinon.spy();
-                this.ev.pageX = 100;
-                this.pm.tap(this.ev);
-                this.ev.$reset();
-
-                this.ev.type = 'mouseup';
+                this.pm.getOrigin = sinon.stub().returns(0, 0);
+                this.pm.getReference = sinon.stub().returns(10, 10);
+                this.pm.getVelocity = sinon.stub();
+                this.pm.isShiftAbove = sinon.stub();
+                this.pm.isVelocityAbove = sinon.stub();
+                this.pm._cleanState = sinon.spy();
             });
 
             it('should be an instance method', function () {
                 expect(this.PM.Movements).to.respondTo('release');
             });
 
-            it('should call autoscroll if |velocity| > 10', function () {
-                var clock = sinon.useFakeTimers();
-                this.pm.getVelocity = sinon.stub().returns(-15);
-
-                this.ev.pageX += 100;
-                clock.tick(500);
-                this.pm.move(this.ev);
-
+            it('should call autoscroll if velocity > 10 and maxShift is above threshold', function () {
+                this.pm.isVelocityAbove.returns(true);
+                this.pm.isShiftAbove.returns(true);
+                this.pm.getVelocity.returns([-15, 0]);
+                var t = this.pm._state.timestamp = 500;
                 this.pm.release(this.ev);
 
                 expect(this.pm.autoscroll, 'pm.autoscroll()').calledOnce
-                    .and.calledWithExactly(-15*0.8, 500);
-
-                clock.restore();
+                    .and.calledWithExactly([-15, 0], t);
             });
 
-            it('should set reference to null', function () {
+            it('should reset the state', function () {
                 this.pm.release(this.ev);
-                expect(this.pm.getReference()).to.be.null;
+                expect(this.pm._cleanState, 'pm._cleanState()').calledOnce
+                    .and.calledWithExactly();
             });
 
             it('should stop event', function () {
@@ -633,27 +724,26 @@ describe('PointerMovementsService', function () {
                     .and.calledWithExactly();
             });
 
-            describe('when maxShift is less than click threshold', function () {
+            describe('when maxShift is below the threshold', function () {
                 beforeEach( function () {
-                    this.ev.pageX = this.pm.getOrigin() + this.clickThreshold - 1;
-                    this.pm.move(this.ev);
-                    this.ev.$reset();
-                    this.onmove.reset();
-                    this.onclick.reset();
+                    this.pm.isShiftAbove.returns(false);
                 });
 
                 it('should shift back to the origin', function () {
-                    var shift = this.pm.getOrigin() - this.pm.getReference();
+                    var origin = this.pm.getOrigin();
+                    var reference = this.pm.getReference();
 
                     this.pm.release(this.ev);
 
                     expect(this.onmove, 'onmove()').calledOnce
-                        .and.calledWithExactly(shift);
+                        .and.calledWithExactly(origin[0]-reference[0], origin[1]-reference[1]);
                 });
 
                 it('should call .onclick(target)', function () {
                     var target = this.ev.target = {an: 'event target'};
+
                     this.pm.release(this.ev);
+
                     expect(this.onclick, 'onclick()').calledOnce
                         .and.calledWithExactly(target);
                 });
@@ -661,7 +751,9 @@ describe('PointerMovementsService', function () {
                 it('should not call the onclick if ev.type is "mouseleave"', function () {
                     var target = this.ev.target = {an: 'event target'};
                     this.ev.type = 'mouseleave';
+
                     this.pm.release(this.ev);
+
                     expect(this.onclick, 'onclick()').not.called;
                 });
 
@@ -670,6 +762,7 @@ describe('PointerMovementsService', function () {
                     this.pm.release(this.ev);
                     expect(this.pm.autoscroll, 'pm.autoscroll()').not.called;
                 });
+
             });
         });
 
@@ -808,7 +901,7 @@ describe('PointerMovementsService', function () {
             });
 
             it('should immediately request animation frame for call self with prevShift=0 when prevShift is not given', function () {
-                this.pm.autoscroll(15, 100);
+                this.pm.autoscroll([10, 20], 100);
 
                 expect(this.$window.requestAnimationFrame, '$window.requestAnimationFrame()').calledOnce
                     .and.calledWithExactly(sinon.match.func);
@@ -817,7 +910,7 @@ describe('PointerMovementsService', function () {
                 this.$window.requestAnimationFrame.firstCall.args[0]();
 
                 expect(this.pm.autoscroll, 'autoscroll').calledOnce
-                    .and.calledWithExactly(15, 100, 0);
+                    .and.calledWithExactly([8, 16], 100, [0, 0]); // note: on initial call amplityde should be reduced by the factor of 0.8
 
                 expect(this.onmove).not.called;
 
@@ -825,49 +918,48 @@ describe('PointerMovementsService', function () {
             });
 
             it('should calculate shift when prevShift is a number', function () {
-                this.pm.autoshift.returns(10);
-                this.pm.autoscroll(15, 100, 0);
+                this.pm.autoshift.returns([5, 10]);
+                this.pm.autoscroll([10, 20], 100, [0, 0]);
 
                 expect(this.pm.autoshift).calledOnce
-                    .and.calledWithExactly(15, 100);
+                    .and.calledWithExactly([10, 20], 100);
             });
 
             it('should call onmove with shift-prevShift when prevShift is a number', function () {
-                this.pm.autoshift.returns(10);
-                this.pm.autoscroll(15, 100, 5);
+                this.pm.autoshift.returns([10, 15]);
+                this.pm.autoscroll([15, 30], 100, [5, 6]);
 
                 expect(this.onmove, 'onmove()').calledOnce
-                    .and.calledWithExactly(5);
+                    .and.calledWithExactly([5, 9]);
             });
 
             it('should request animation frame with self, prevShift=shift if |shift| >= 0.5', function () {
-                this.pm.autoshift.returns(10);
-                this.pm.autoscroll(15, 100, 5);
+                this.pm.autoshift.returns([10, 10]);
+                this.pm.autoscroll([15, 15], 100, [5, 5]);
 
                 expect(this.$window.requestAnimationFrame, '$window.requestAnimationFrame()').calledOnce
                     .and.calledWithExactly(sinon.match.func);
 
                 this.pm.autoscroll = sinon.spy();
-
                 this.$window.requestAnimationFrame.firstCall.args[0]();
 
                 expect(this.pm.autoscroll, 'pm.autoscroll()').calledOnce
-                    .and.calledWithExactly(15, 100, 10);
+                    .and.calledWithExactly([15, 15], 100, [10, 10]);
             });
 
             it('should not request animation frame when |shift-amplitude| < 0.5', function () {
-                this.pm.autoshift.returns(14.6);
-                this.pm.autoscroll(15, 100, 5);
+                this.pm.autoshift.returns([14.6, 14.6]);
+                this.pm.autoscroll([15, 15], 100, [5, 5]);
 
                 expect(this.$window.requestAnimationFrame).not.called;
             });
 
             it('should call onmove with amplitude - prevShift when |shift - amplitude| < 0.5', function () {
-                this.pm.autoshift.returns(14.6);
-                this.pm.autoscroll(15, 100, 5);
+                this.pm.autoshift.returns([14.6, 14.6]);
+                this.pm.autoscroll([15, 15], 100, [5, 5]);
 
                 expect(this.onmove, 'onmove()').calledOnce
-                    .and.calledWithExactly(10);
+                    .and.calledWithExactly([10, 10]);
             });
         });
 
