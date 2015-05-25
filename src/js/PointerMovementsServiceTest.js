@@ -268,17 +268,19 @@ describe('PointerMovementsService', function () {
 
 
 
-        describe('#getDeltaX(ev)', function () {
+        describe('#getDeltaXY(ev)', function () {
             it('should be an instance method', function () {
-                expect(this.PM.Movements).to.respondTo('getDeltaX');
+                expect(this.PM.Movements).to.respondTo('getDeltaXY');
             });
 
-            it('should return ev.deltaX', function () {
-                expect(this.pm.getDeltaX({deltaX: 100})).to.equal(100);
+            it('should return [ev.deltaX, ev.deltaY]', function () {
+                expect(this.pm.getDeltaXY({deltaX: 100, deltaY: 200}))
+                    .to.deep.equal([100, 200]);
             });
 
             it('should respect jQuery events', function () {
-                expect(this.pm.getDeltaX({originalEvent: {deltaX: 100}})).to.equal(100);
+                expect(this.pm.getDeltaXY({originalEvent: {deltaX: 100, deltaY: 200}}))
+                    .to.deep.equal([100, 200]);
             });
         });
 
@@ -361,7 +363,7 @@ describe('PointerMovementsService', function () {
             });
 
             it('should return flase for wheel events if deltaX is 0', function () {
-                var ev = {deltaX: 0};
+                var ev = {deltaX: 0, deltaY: 0};
                 var pm = this.pm;
                 'wheel,mousewheel,MozMousePixelScroll'.split(',').forEach(function (type) {
                     ev.type = type;
@@ -380,7 +382,7 @@ describe('PointerMovementsService', function () {
             });
 
             it('should recognize jQuery events', function () {
-                var ev = {type: 'wheel', originalEvent: {deltaX: 0}};
+                var ev = {type: 'wheel', originalEvent: {deltaX: 0,deltaY: 0}};
                 expect(this.pm.isEventRelevant(ev)).to.be.false;
 
                 ev.originalEvent.deltaX = -10;
@@ -432,8 +434,8 @@ describe('PointerMovementsService', function () {
                 expect(this.PM.Movements).to.respondTo('getScroll');
             });
 
-            it('should return 0 by default', function () {
-                expect( this.pm.getScroll() ).to.equal(0);
+            it('should return [0, 0] by default', function () {
+                expect( this.pm.getScroll() ).to.deep.equal([0, 0]);
             });
         });
 
@@ -606,11 +608,10 @@ describe('PointerMovementsService', function () {
             });
 
             it('should do nothing if wheel scrolling is active', function () {
-                var spy = sinon.spy(this.pm, 'getX');
                 this.pm._state.wheelTimer = {};
+                this.pm.getXY.reset();
                 this.pm.move(this.ev);
-                expect(spy).not.called;
-                spy.restore();
+                expect(this.pm.getXY).not.called;
             });
 
             it('should stop event', function () {
@@ -687,8 +688,8 @@ describe('PointerMovementsService', function () {
                 this.pm._cleanState();
                 this.pm.isEventRelevant = sinon.stub().returns(true);
                 this.pm.autoscroll = sinon.spy();
-                this.pm.getOrigin = sinon.stub().returns(0, 0);
-                this.pm.getReference = sinon.stub().returns(10, 10);
+                this.pm.getOrigin = sinon.stub().returns([0, 0]);
+                this.pm.getReference = sinon.stub().returns([10, 10]);
                 this.pm.getVelocity = sinon.stub();
                 this.pm.isShiftAbove = sinon.stub();
                 this.pm.isVelocityAbove = sinon.stub();
@@ -734,7 +735,8 @@ describe('PointerMovementsService', function () {
                     var reference = this.pm.getReference();
 
                     this.pm.release(this.ev);
-
+                    expect(origin).to.exist;
+                    expect(reference).to.exist;
                     expect(this.onmove, 'onmove()').calledOnce
                         .and.calledWithExactly(origin[0]-reference[0], origin[1]-reference[1]);
                 });
@@ -779,12 +781,8 @@ describe('PointerMovementsService', function () {
                 this.pm.getOrigin = sinon.stub();
 
                 this.ev.$reset();
-                this.ev.deltaX = 1;
-                this.ev.pageX = 100;
-                this.ev.type = 'wheel';
-
-                this.X = 200;
-                this.pm.getX = sinon.stub().withArgs(this.ev).returns(this.X);
+                this.XY = [200, 300];
+                this.pm.getXY = sinon.stub().withArgs(this.ev).returns(this.XY);
             });
 
             it('should be an instance method', function () {
@@ -792,12 +790,12 @@ describe('PointerMovementsService', function () {
             });
 
             it('should call #_tap and start wheel release timer if reference is not set yet', function () {
-                this.pm._state.reference = null;
+                this.pm._cleanState();
 
                 this.pm.wheel(this.ev);
 
                 expect(this.pm._tap, 'pm._tap()').calledOnce
-                    .and.calledWithExactly(this.X);
+                    .and.calledWithExactly(this.XY);
                 expect(this.pm._startWheelReleaseTimer, 'pm._startWheelReleaseTimer()').calledOnce
                     .and.calledWithExactly();
             });
@@ -930,7 +928,7 @@ describe('PointerMovementsService', function () {
                 this.pm.autoscroll([15, 30], 100, [5, 6]);
 
                 expect(this.onmove, 'onmove()').calledOnce
-                    .and.calledWithExactly([5, 9]);
+                    .and.calledWithExactly(5, 9);
             });
 
             it('should request animation frame with self, prevShift=shift if |shift| >= 0.5', function () {
@@ -959,7 +957,7 @@ describe('PointerMovementsService', function () {
                 this.pm.autoscroll([15, 15], 100, [5, 5]);
 
                 expect(this.onmove, 'onmove()').calledOnce
-                    .and.calledWithExactly([10, 10]);
+                    .and.calledWithExactly(10, 10);
             });
         });
 

@@ -96,17 +96,14 @@ angular.module('tutScroller').factory('PointerMovements', [
 
     function getEventRef (ev) {
         return ref =
-            ev.pageX ?
-                ev :
-            typeof ev.originalEvent.pageX === 'number' ?
+            typeof ev.originalEvent === 'object' ?
                 ev.originalEvent :
-                {};
-
+                ev;
     }
 
     p.getDeltaXY = function getDeltaXY (ev) {
         var ref = getEventRef(ev);
-        return [ref.deltaX, ref.deltaY];
+        return [ref.deltaX || 0, ref.deltaY || 0];
     };
 
 
@@ -117,8 +114,8 @@ angular.module('tutScroller').factory('PointerMovements', [
         if ( ev === null || typeof ev !== 'object') return false;
 
         if ( ev.type.match(/wheel/) || ev.type === 'MozMousePixelScroll' ) {
-            value = this.getDeltaXY(ev) || null;
-            return value !== null;
+            value = this.getDeltaXY(ev);
+            return !vIsZero(value);
         }
 
         if ( ev.type.substr(0,5) === 'mouse' ) {
@@ -202,15 +199,15 @@ angular.module('tutScroller').factory('PointerMovements', [
 
     p.move = function move (ev) {
         if ( this._state.reference === null ) return _stopEvent(ev);
-if ( ! vIsZero(this._state.scroll) || null !== this._state.wheelTimer ) return _stopEvent(ev);
+        if ( ! vIsZero(this._state.scroll) || null !== this._state.wheelTimer ) return _stopEvent(ev);
 
         var xy = this.getXY(ev);
-this._move(xy);
+        this._move(xy);
 
         return _stopEvent(ev);
     };
 
-p._move = function _move (xy) {
+    p._move = function _move (xy) {
         var dxy = vDiff(xy, this._state.reference);
 
         if ( typeof this.onmove === 'function' ) {
@@ -221,7 +218,7 @@ p._move = function _move (xy) {
         this.updateVelocity(dxy);
         this._state.reference = xy;
 
-};
+    };
 
     p.updateMaxShift = function updateMaxShift (pos) {
         var origin   = this._state.origin;
@@ -277,20 +274,20 @@ p._move = function _move (xy) {
     }
 
 
-// FIXME: xy!
     p.wheel = function wheel (ev) {
-        if ( ! this.isEventRelevant(ev) ) {
-            return _stopEvent(ev);
-        }
+        if ( ! this.isEventRelevant(ev) ) return _stopEvent(ev);
 
-        if ( typeof this._state.reference !== 'number' ) {
-            this._tap( this.getX(ev) );
+        if ( this._state.reference === null ) {
+            this._tap( this.getXY(ev) );
             this._startWheelReleaseTimer();
         }
 
-        var dx = this.getDeltaX(ev) < 0 ?
-            -WHEEL_DELTA : WHEEL_DELTA;
-        this._state.scroll += dx; // FIXME: very ugly state manipulation\
+        var dx = this.getDeltaXY(ev);
+        dx = [
+            (dx[0] < 0 ? -WHEEL_DELTA : WHEEL_DELTA),
+            (dx[1] < 0 ? -WHEEL_DELTA : WHEEL_DELTA)
+        ];
+        this._state.scroll = vAdd(this._state.scroll, dx); // FIXME: very ugly state manipulation\
 
         return _stopEvent(ev);
     };
@@ -353,12 +350,22 @@ p._move = function _move (xy) {
         return false;
     }
 
+
     function vDiff (v1, v2) {
         return [
                 v1[0] - v2[0],
                 v1[1] - v2[1]
         ];
     }
+
+
+    function vAdd (v1, v2) {
+        return [
+            (v1[0] + v2[0]),
+            (v1[1] + v2[1])
+        ];
+    }
+
 
     function vDiffAbs (v1, v2) {
         return [
@@ -377,9 +384,9 @@ p._move = function _move (xy) {
         return v;
     }
 
-function vIsZero (v) {
-return v && v[0] === 0 && v[1] === 0;
-}
+    function vIsZero (v) {
+        return v && v[0] === 0 && v[1] === 0;
+    }
 
 
     return {
