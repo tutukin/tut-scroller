@@ -167,6 +167,7 @@ angular.module('tutScroller').factory('PointerMovements', [
         this.onclick = options.onclick || nop;
         this.onmove = options.onmove || nop;
         this.clickThreshold = options.clickThreshold || 0;
+        this.mode = options.mode || 'x';
 
         this._cleanState();
     }
@@ -183,19 +184,18 @@ angular.module('tutScroller').factory('PointerMovements', [
 
     p._cleanState = function _cleanState () {
         this._state = {
-            maxShift:   0,
-            velocity:   0,
+            maxShift:   [0, 0],
+            velocity:   [0, 0],
             timestamp:  null,
             reference:  null,
             origin:     null,
-            scroll:     0,
+            scroll:     [0, 0],
             wheelTimer: null
         };
     };
 
 
-
-    p.getX = function getX (ev) {
+    p.getXY = function getXY (ev) {
         touches = ev.targetTouches ?
             ev.targetTouches :
             ev.originalEvent ?
@@ -203,23 +203,26 @@ angular.module('tutScroller').factory('PointerMovements', [
                 null;
 
         if ( touches && touches.length > 0 ) {
-            return touches[0].clientX;
+            return [touches[0].clientX, touches[0].clientY];
         }
 
-        return typeof ev.pageX === 'number' ?
-                ev.pageX :
-            typeof ev.originalEvent.pageX === 'number' ?
-                ev.originalEvent.pageX :
-                undefined;
+        var ref = getEventRef(ev);
+
+        return [ref.pageX, ref.pageY];
     };
 
+    function getEventRef (ev) {
+        return ref =
+            typeof ev.originalEvent === 'object' ?
+                ev.originalEvent :
+                ev;
+    }
 
-    p.getDeltaX = function getDeltaX (ev) {
-        return typeof ev.deltaX === 'number' ?
-                ev.deltaX :
-            typeof ev.originalEvent.deltaX === 'number' ?
-                ev.originalEvent.deltaX : undefined;
+    p.getDeltaXY = function getDeltaXY (ev) {
+        var ref = getEventRef(ev);
+        return [ref.deltaX || 0, ref.deltaY || 0];
     };
+
 
 
 
@@ -228,8 +231,8 @@ angular.module('tutScroller').factory('PointerMovements', [
         if ( ev === null || typeof ev !== 'object') return false;
 
         if ( ev.type.match(/wheel/) || ev.type === 'MozMousePixelScroll' ) {
-            value = this.getDeltaX(ev) || 0;
-            return value !== 0;
+            value = this.getDeltaXY(ev);
+            return !vIsZero(value);
         }
 
         if ( ev.type.substr(0,5) === 'mouse' ) {
@@ -239,23 +242,34 @@ angular.module('tutScroller').factory('PointerMovements', [
         return true;
     };
 
+    function arrCopy (x) {
+        return x && x.length ?
+            Array.prototype.slice.call(x) :
+            x;
+    }
+
 
 
 
     p.getMaxShift = function getMaxShift () {
-        return this._state.maxShift;
+        return arrCopy(this._state.maxShift);
+    };
+
+    p.isShiftAbove = function isShiftAbove (s) {
+        var sxy = this.getMaxShift();
+        return vLenSq(sxy) > s*s;
     };
 
     p.getReference = function getReference () {
-        return this._state.reference;
+        return arrCopy(this._state.reference);
     };
 
     p.getOrigin = function getOrigin () {
-        return this._state.origin;
+        return arrCopy(this._state.origin);
     };
 
     p.getScroll = function getScroll () {
-        return this._state.scroll;
+        return arrCopy(this._state.scroll);
     };
 
     p.getWheelReleaseTimer = function getWheelReleaseTimer () {
@@ -263,62 +277,87 @@ angular.module('tutScroller').factory('PointerMovements', [
     };
 
     p.getVelocity = function getVelocity () {
-        return this._state.velocity;
+        return arrCopy(this._state.velocity);
+    };
+
+    p.isVelocityAbove = function isVelocityAbove (v) {
+        v = Math.abs(v);
+        var v0 = this.getVelocity();
+        var vx = Math.abs(v0[0]);
+        var vy = Math.abs(v0[1]);
+
+        var dv =
+            this.mode === 'y' ?
+                vy - v :
+            this.mode === 'xy' ?
+                vLenSq([vx, vy]) - v*v :
+                vx - v;
+
+        return dv > 0;
     };
 
 
-
     p.tap = function tap (ev) {
-        if ( ! this.isEventRelevant(ev) ) {
-            return;
-        }
+        if ( ! this.isEventRelevant(ev) ) return;
 
-        var x = this.getX(ev);
-        this._tap(x);
+        var xy = this.getXY(ev);
+        this._tap(xy);
 
         return _stopEvent(ev);
     };
 
-    p._tap = function _tap (x) {
-        this._state.origin = this._state.reference = x;
-        this._state.maxShift = 0;
+    p._tap = function _tap (xy) {
+        this._state.origin = this._state.reference = xy;
         this._state.timestamp = Date.now();
+        this._state.maxShift = [0, 0];
     };
 
 
 
     p.move = function move (ev) {
-        if ( typeof this._state.reference !== 'number' ) {
-            return;
-        }
+        if ( this._state.reference === null ) return _stopEvent(ev);
+        if ( ! vIsZero(this._state.scroll) || null !== this._state.wheelTimer ) return _stopEvent(ev);
 
-        if ( 0 !== this._state.scroll || null !== this._state.wheelTimer ) {
-            return _stopEvent(ev);
-        }
+        var xy = this.getXY(ev);
+        this._move(xy);
 
-        var x = this.getX(ev);
-        this._move(x);
         return _stopEvent(ev);
     };
 
+    p._move = function _move (xy) {
+        var dxy = vDiff(xy, this._state.reference);
 
-    p._move = function _move(x) {
-        var dist = x - this._state.reference;
         if ( typeof this.onmove === 'function' ) {
-            this.onmove(dist);
+            this.onmove(dxy[0], dxy[1]);
         }
 
-        var shift = Math.abs(x - this._state.origin);
-        this._state.maxShift = shift > this._state.maxShift ?
-            shift : this._state.maxShift;
+        this.updateMaxShift(xy);
+        this.updateVelocity(dxy);
+        this._state.reference = xy;
 
-        var timestamp = Date.now();
-        var v = 1000*dist / (1 + timestamp - this._state.timestamp);
-        this._state.velocity = 0.8*v + 0.2*this._state.velocity;
-        this._state.timestamp = timestamp;
-
-        this._state.reference = x;
     };
+
+    p.updateMaxShift = function updateMaxShift (pos) {
+        var origin   = this._state.origin;
+        var maxShift = this._state.maxShift;
+
+        var shift = vDiffAbs(pos, origin);
+
+        maxShift[0] = shift[0] > maxShift[0] ? shift[0] : maxShift[0];
+        maxShift[1] = shift[1] > maxShift[1] ? shift[1] : maxShift[1];
+    }
+
+    p.updateVelocity = function (dxy) {
+        var timestamp = Date.now();
+        var dt = 1 + timestamp - this._state.timestamp;
+        var vx = 1000 * dxy[0] / dt;
+        var vy = 1000 * dxy[1] / dt;
+        this._state.velocity = [
+            0.8*vx + 0.2*this._state.velocity[0],
+            0.8*vy + 0.2*this._state.velocity[1]
+        ];
+        this._state.timestamp = timestamp;
+    }
 
 
 
@@ -328,23 +367,23 @@ angular.module('tutScroller').factory('PointerMovements', [
         return _stopEvent(ev);
     };
 
-
-
     p._release = function _release (target) {
         var v;
-        if ( this._state.maxShift < this.clickThreshold ) {
+        if ( this.isShiftAbove(this.clickThreshold) ) {
+            if ( this.isVelocityAbove(10) ) {
+                v = this.getVelocity();
+                this.autoscroll(v, this._state.timestamp);
+            }
+        }
+        else {
             if ( typeof this.onmove === 'function' ) {
-                this.onmove(this._state.origin - this._state.reference);
+                var o = this.getOrigin();
+                var r = this.getReference();
+                if ( o && r ) this.onmove(o[0]-r[0], o[1]-r[1]);
             }
 
             if ( target && typeof this.onclick === 'function' ) {
                 this.onclick(target);
-            }
-        }
-        else {
-            v = this.getVelocity();
-            if ( v > 10 || v < -10 ) {
-                this.autoscroll(0.8*v, this._state.timestamp);
             }
         }
 
@@ -353,18 +392,19 @@ angular.module('tutScroller').factory('PointerMovements', [
 
 
     p.wheel = function wheel (ev) {
-        if ( ! this.isEventRelevant(ev) ) {
-            return _stopEvent(ev);
-        }
+        if ( ! this.isEventRelevant(ev) ) return _stopEvent(ev);
 
-        if ( typeof this._state.reference !== 'number' ) {
-            this._tap( this.getX(ev) );
+        if ( this._state.reference === null ) {
+            this._tap( this.getXY(ev) );
             this._startWheelReleaseTimer();
         }
 
-        var dx = this.getDeltaX(ev) < 0 ?
-            -WHEEL_DELTA : WHEEL_DELTA;
-        this._state.scroll += dx; // FIXME: very ugly state manipulation\
+        var dx = this.getDeltaXY(ev);
+        dx = [
+            (dx[0] < 0 ? -WHEEL_DELTA : WHEEL_DELTA),
+            (dx[1] < 0 ? -WHEEL_DELTA : WHEEL_DELTA)
+        ];
+        this._state.scroll = vAdd(this._state.scroll, dx); // FIXME: very ugly state manipulation\
 
         return _stopEvent(ev);
     };
@@ -388,20 +428,25 @@ angular.module('tutScroller').factory('PointerMovements', [
 
 
     p.autoscroll = function autoscroll (amplitude, t0, prevShift) {
+        amplitude = amplitude instanceof Array ? amplitude : [amplitude, 0];
+        amplitude = prevShift ? amplitude : vScale(amplitude, 0.8);
         var _this = this;
-        var shift = 0;
-        var delta = 0;
+        var shift = [0, 0];
+        var delta = [0, 0];
+        var d;
 
-        if ( typeof prevShift === 'number' ) {
+        if ( prevShift ) {
             shift = this.autoshift(amplitude, t0);
-            delta = Math.abs(shift - amplitude);
+            delta = vDiffAbs(shift, amplitude);
 
-            if ( delta < 0.5 ) {
-                this.onmove(amplitude-prevShift);
+            if ( delta[0] < 0.5 && delta[1] < 0.5 ) {
+                d = vDiff(amplitude, prevShift);
+                this.onmove(d[0], d[1]);
                 return;
             }
 
-            this.onmove(shift - prevShift);
+            d = vDiff(shift, prevShift);
+            this.onmove(d[0], d[1]);
         }
 
         $window.requestAnimationFrame( function () {
@@ -412,7 +457,7 @@ angular.module('tutScroller').factory('PointerMovements', [
     p.autoshift = function autoshift (amplitude, t0) {
         var tau = ( t0 - Date.now() ) / 325.0;
         var d = 1.0 - Math.exp(tau);
-        return amplitude * d;
+        return vScale(arrCopy(amplitude), d);
     };
 
 
@@ -420,6 +465,44 @@ angular.module('tutScroller').factory('PointerMovements', [
         ev.preventDefault();
         ev.stopPropagation();
         return false;
+    }
+
+
+    function vDiff (v1, v2) {
+        return [
+                v1[0] - v2[0],
+                v1[1] - v2[1]
+        ];
+    }
+
+
+    function vAdd (v1, v2) {
+        return [
+            (v1[0] + v2[0]),
+            (v1[1] + v2[1])
+        ];
+    }
+
+
+    function vDiffAbs (v1, v2) {
+        return [
+                Math.abs(v1[0] - v2[0]),
+                Math.abs(v1[1] - v2[1])
+        ];
+    }
+
+    function vLenSq (v) {
+        return v[0]*v[0] + v[1]*v[1];
+    }
+
+    function vScale (v, factor) {
+        v[0] = v[0] * factor;
+        v[1] = v[1] * factor;
+        return v;
+    }
+
+    function vIsZero (v) {
+        return v && v[0] === 0 && v[1] === 0;
     }
 
 
