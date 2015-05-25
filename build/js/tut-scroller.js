@@ -125,6 +125,10 @@ angular.module('tutScroller').factory('PointerMovements', [
     function attachTo (target, options) {
         var service = new this.Movements(options);
 
+        $window.addEventListener('resize', function () {
+            service.resize();
+        });
+
         if ( typeof $window.ontouchstart !== 'undefined' ) {
             target.on('touchstart', tap);
             target.on('touchmove', move);
@@ -166,6 +170,7 @@ angular.module('tutScroller').factory('PointerMovements', [
     function Movements (options) {
         this.onclick = options.onclick || nop;
         this.onmove = options.onmove || nop;
+        this.onresize = options.onresize || nop;
         this.clickThreshold = options.clickThreshold || 0;
         this.mode = options.mode || 'x';
 
@@ -202,6 +207,17 @@ angular.module('tutScroller').factory('PointerMovements', [
         $window.requestAnimationFrame( function () {
             state.throttle = false;
         });
+    };
+
+
+
+    p.resize = function resize () {
+        if ( this._state.throttle ) return;
+
+        if ( typeof this.onresize === 'function' ) {
+            this.throttle();
+            this.onresize();
+        }
     };
 
 
