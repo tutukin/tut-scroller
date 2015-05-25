@@ -3,7 +3,7 @@ angular.module('tutScroller').factory('PointerMovements', [
     function ($window, $document, $timeout) {
 
         var WHEEL_TIMEOUT = 50;
-        var WHEEL_DELTA = 3;
+        var WHEEL_DELTA = 1;
 
     function attachTo (target, options) {
         var service = new this.Movements(options);
@@ -73,8 +73,18 @@ angular.module('tutScroller').factory('PointerMovements', [
             reference:  null,
             origin:     null,
             scroll:     [0, 0],
-            wheelTimer: null
+            wheelTimer: null,
+            throttle:   false
         };
+    };
+
+
+    p.throttle = function throttle () {
+        var state = this._state;
+        state.throttle = true;
+        $window.requestAnimationFrame( function () {
+            state.throttle = false;
+        });
     };
 
 
@@ -198,9 +208,11 @@ angular.module('tutScroller').factory('PointerMovements', [
 
 
     p.move = function move (ev) {
+        if ( this._state.throttle ) return _stopEvent(ev);
         if ( this._state.reference === null ) return _stopEvent(ev);
         if ( ! vIsZero(this._state.scroll) || null !== this._state.wheelTimer ) return _stopEvent(ev);
 
+        this.throttle();
         var xy = this.getXY(ev);
         this._move(xy);
 
@@ -275,6 +287,7 @@ angular.module('tutScroller').factory('PointerMovements', [
 
 
     p.wheel = function wheel (ev) {
+        if ( this._state.throttle ) return _stopEvent(ev);
         if ( ! this.isEventRelevant(ev) ) return _stopEvent(ev);
 
         if ( this._state.reference === null ) {
@@ -287,7 +300,10 @@ angular.module('tutScroller').factory('PointerMovements', [
             (dx[0] < 0 ? -WHEEL_DELTA : WHEEL_DELTA),
             (dx[1] < 0 ? -WHEEL_DELTA : WHEEL_DELTA)
         ];
-        this._state.scroll = vAdd(this._state.scroll, dx); // FIXME: very ugly state manipulation\
+
+        this._state.scroll = vAdd(this._state.scroll, dx); // FIXME: very ugly state manipulation
+
+        this.throttle();
 
         return _stopEvent(ev);
     };

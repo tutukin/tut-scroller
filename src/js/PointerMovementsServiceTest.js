@@ -268,6 +268,33 @@ describe('PointerMovementsService', function () {
 
 
 
+        describe('#throttle()', function () {
+            it('should be an instance method', function () {
+                expect(this.PM.Movements).to.respondTo('throttle');
+            });
+
+            it('should set _state.throttle to true', function () {
+                expect(this.pm._state.throttle).to.be.false;
+                this.pm.throttle();
+                expect(this.pm._state.throttle).to.be.true;
+            });
+
+            it('should request animation frame', function () {
+                this.pm.throttle();
+                expect(this.$window.requestAnimationFrame, '$window.requestAnimationFrame()').calledOnce
+                    .and.calledWithExactly(sinon.match.func);
+            });
+
+            it('should set throttle to false on next animation frame', function () {
+                this.pm.throttle();
+                this.$window.requestAnimationFrame.firstCall.args[0]();
+                expect(this.pm._state.throttle).to.be.false;
+            });
+        });
+
+
+
+
         describe('#getDeltaXY(ev)', function () {
             it('should be an instance method', function () {
                 expect(this.PM.Movements).to.respondTo('getDeltaXY');
@@ -583,6 +610,7 @@ describe('PointerMovementsService', function () {
                 this.pm.tap(this.ev);
                 this.ev.$reset();
 
+                this.pm.throttle = sinon.spy();
             });
 
             it('should be an instance method', function () {
@@ -601,15 +629,29 @@ describe('PointerMovementsService', function () {
                 expect(this.pm.getReference()).to.deep.equal(this.XY);
             });
 
-            it('should do nothing if no mousedown event occured before', function () {
-                this.pm._cleanState();
+            it('should activate the throttle', function () {
                 this.pm.move(this.ev);
-                expect(this.pm.getReference()).to.be.null;
+                expect(this.pm.throttle, 'pm.throttle()').calledOnce
+                    .and.calledWithExactly();
+            });
+
+            it('should do nothing if no mousedown event occured before', function () {
+                this.pm._cleanState(); // virtually: no mousedown yet
+                this.pm.getXY.reset();
+                this.pm.move(this.ev);
+                expect(this.pm.getXY).not.called;
             });
 
             it('should do nothing if wheel scrolling is active', function () {
                 this.pm._state.wheelTimer = {};
                 this.pm.getXY.reset();
+                this.pm.move(this.ev);
+                expect(this.pm.getXY).not.called;
+            });
+
+            it('should do nothing if throttle is active', function () {
+                this.pm.getXY.reset();
+                this.pm._state.throttle = true;
                 this.pm.move(this.ev);
                 expect(this.pm.getXY).not.called;
             });
@@ -783,6 +825,7 @@ describe('PointerMovementsService', function () {
                 this.ev.$reset();
                 this.XY = [200, 300];
                 this.pm.getXY = sinon.stub().withArgs(this.ev).returns(this.XY);
+                this.pm.throttle = sinon.spy();
             });
 
             it('should be an instance method', function () {
@@ -805,6 +848,19 @@ describe('PointerMovementsService', function () {
                 this.pm.wheel(this.ev);
                 expect(this.pm._startWheelReleaseTimer, 'pm._startWheelReleaseTimer()')
                     .not.called;
+            });
+
+            it('should do nothing if throttle is active', function () {
+                this.pm._state.throttle = true;
+                this.pm.wheel(this.ev);
+                expect(this.pm._startWheelReleaseTimer, 'pm._startWheelReleaseTimer()')
+                    .not.called;
+            });
+
+            it('should activate the throttle', function () {
+                this.pm.wheel(this.ev);
+                expect(this.pm.throttle, 'pm.throttle()').calledOnce
+                    .and.calledWithExactly();
             });
 
             it('should update scroll value', function () {
