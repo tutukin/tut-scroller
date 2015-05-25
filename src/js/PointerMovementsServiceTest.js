@@ -1,11 +1,12 @@
-describe('PointerMovementsService', function () {
+describe.only('PointerMovementsService', function () {
     beforeEach(module('tutScroller'));
 
     beforeEach( function () {
         var _this = this;
 
         this.$window = {
-            requestAnimationFrame: sinon.spy()
+            requestAnimationFrame: sinon.spy(),
+            addEventListener:      sinon.spy()
         };
 
         this.$document = [{}];
@@ -56,7 +57,7 @@ describe('PointerMovementsService', function () {
             ['mousedown', 'mousemove', 'mouseup', 'mouseleave',
                 'touchstart', 'touchmove', 'touchend',
                 'wheel', 'mousewheel', 'MozMousePixelScroll',
-                'onmousewheel'].forEach( function (en) {
+                'onmousewheel', 'resize'].forEach( function (en) {
                     target.on.withArgs(en);
                 });
 
@@ -66,7 +67,8 @@ describe('PointerMovementsService', function () {
                 tap:    sinon.spy(),
                 move:   sinon.spy(),
                 release:sinon.spy(),
-                wheel:  sinon.spy()
+                wheel:  sinon.spy(),
+                resize: sinon.spy()
             };
 
             this.PM.Movements = sinon.stub().returns(this.service);
@@ -103,6 +105,26 @@ describe('PointerMovementsService', function () {
 
             expect(this.target.on.withArgs('touchstart'), 'on("touchstart")').to.not.called;
         });
+
+
+
+        it('should bind service.resize() to "resize" event of window', function () {
+            var service = this.PM.attachTo(this.target, this.options);
+
+            expect(this.$window.addEventListener, '$window.addEventListener').calledOnce
+                .and.calledWithExactly('resize', sinon.match.func);
+
+            expect(this.service.resize).not.called;
+
+            this.$window.addEventListener.firstCall.args[1]();
+
+            expect(this.service.resize, 'service.resize()').calledOnce
+                .and.calledOn(this.service)
+                .and.calledWithExactly();
+
+            expect(this.target.on.withArgs('touchstart'), 'on("touchstart")').to.not.called;
+        });
+
 
         it('should attach both "touchstart" and "mousedown" events if $window.ontouchstart is defined', function () {
             this.$window.ontouchstart = 'defined';
@@ -240,11 +262,13 @@ describe('PointerMovementsService', function () {
         beforeEach( function () {
             this.onmove = sinon.spy();
             this.onclick = sinon.spy();
+            this.onresize = sinon.spy();
             this.clickThreshold = 8;
 
             this.pm = new this.PM.Movements({
                 onmove:     this.onmove,
                 onclick:    this.onclick,
+                onresize:   this.onresize,
                 clickThreshold: this.clickThreshold
             });
         });
@@ -289,6 +313,44 @@ describe('PointerMovementsService', function () {
                 this.pm.throttle();
                 this.$window.requestAnimationFrame.firstCall.args[0]();
                 expect(this.pm._state.throttle).to.be.false;
+            });
+        });
+
+
+
+        describe('#resize()', function () {
+            beforeEach( function () {
+                this.pm.throttle = sinon.spy();
+            });
+
+            it('should be an instance method', function () {
+                expect(this.PM.Movements).to.respondTo('resize');
+            });
+
+            it('should call onresize', function () {
+                this.pm.resize();
+                expect(this.onresize, 'onresize()').calledOnce
+                    .and.calledWithExactly();
+            });
+
+            it('should do nothing if the throttle is active', function () {
+                this.pm._state.throttle = true;
+                this.pm.resize();
+                expect(this.onresize, 'onresize()').not.called;
+            });
+
+            it('should activate the throttle', function () {
+                this.pm.resize();
+
+                expect(this.pm.throttle, 'pm.throttle()').calledOnce
+                    .and.calledWithExactly();
+            });
+
+            it('should not activate throttle if there is no resize listener', function () {
+                this.pm.onresize = null;
+                this.pm.resize();
+
+                expect(this.pm.throttle, 'pm.throttle()').not.called;
             });
         });
 
