@@ -84,6 +84,8 @@ angular.module('tutScroller').factory('PointerMovements', [
     };
 
 
+    // FIXME: use Clock.throttle
+    // FIXME: maybe all the event attachments should go to a directive
     p.throttle = function throttle () {
         var state = this._state;
         state.throttle = true;
